@@ -2,13 +2,14 @@ package mcp
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/mark3labs/mcp-go/mcp"
 
+	approvalspkg "github.com/10xdev4u-alt/agent-chat/internal/approvals"
+	auditpkg "github.com/10xdev4u-alt/agent-chat/internal/audit"
 	dbpkg "github.com/10xdev4u-alt/agent-chat/internal/db"
 	roomspkg "github.com/10xdev4u-alt/agent-chat/internal/rooms"
 )
@@ -112,6 +113,11 @@ func (s *Server) handleSendMessage(ctx context.Context, request mcp.CallToolRequ
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
+	_ = auditpkg.Log(s.DB, agentID, "send_message", "message", msgID, map[string]any{
+		"room_id": roomID,
+		"seq":     seq,
+	})
+
 	result := map[string]any{
 		"message_id": msgID,
 		"seq":        seq,
@@ -192,11 +198,7 @@ func (s *Server) handleRequestApproval(ctx context.Context, request mcp.CallTool
 	description := request.GetString("description", "")
 	riskLevel := request.GetString("risk_level", "medium")
 
-	id := uuid.New().String()
-	_, err := s.DB.Exec(
-		`INSERT INTO approvals (id, room_id, requester_id, action, description, risk_level) VALUES (?, ?, ?, ?, ?, ?)`,
-		id, roomID, agentID, action, nullable(description), riskLevel,
-	)
+	id, err := approvalspkg.CreateApproval(s.DB, roomID, agentID, action, description, riskLevel)
 	if err != nil {
 		return nil, fmt.Errorf("create approval: %w", err)
 	}
@@ -214,18 +216,15 @@ func (s *Server) handleCheckApproval(ctx context.Context, request mcp.CallToolRe
 	if approvalID == "" {
 		return mcp.NewToolResultError("approval_id is required"), nil
 	}
-	var status, note sql.NullString
-	err := s.DB.QueryRow(
-		`SELECT status, description FROM approvals WHERE id = ?`, approvalID,
-	).Scan(&status, &note)
+	ap, err := approvalspkg.GetApproval(s.DB, approvalID)
 	if err != nil {
 		return mcp.NewToolResultError("approval not found"), nil
 	}
 	result := map[string]any{
-		"status": status.String,
+		"status": ap.Status,
 	}
-	if note.Valid {
-		result["note"] = note.String
+	if ap.Description != "" {
+		result["note"] = ap.Description
 	}
 	b, _ := json.Marshal(result)
 	return mcp.NewToolResultText(string(b)), nil

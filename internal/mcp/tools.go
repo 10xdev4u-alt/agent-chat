@@ -66,6 +66,7 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithArray("mentions", mcp.Description("Mentioned agent IDs"), mcp.WithStringItems()),
 		mcp.WithString("reply_to", mcp.Description("Reply-to message ID")),
 		mcp.WithString("priority", mcp.Description("Priority: urgent, normal, fyi")),
+		mcp.WithArray("attachment_ids", mcp.Description("Attachment IDs to attach"), mcp.WithStringItems()),
 		mcp.WithTitleAnnotation("Send Message"),
 		mcp.WithReadOnlyHintAnnotation(false),
 		mcp.WithDestructiveHintAnnotation(false),
@@ -130,4 +131,28 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithIdempotentHintAnnotation(true),
 		mcp.WithOpenWorldHintAnnotation(false),
 	), srv.handleCheckApproval)
+
+	s.AddTool(mcp.NewTool("attach_file",
+		mcp.WithDescription("Attach a file to a message"),
+		mcp.WithString("message_id", mcp.Required(), mcp.Description("Message ID")),
+		mcp.WithString("filename", mcp.Required(), mcp.Description("Filename")),
+		mcp.WithString("content_type", mcp.Description("Content type")),
+		mcp.WithNumber("size_bytes", mcp.Required(), mcp.Description("Size in bytes")),
+		mcp.WithString("storage_path", mcp.Required(), mcp.Description("Storage path")),
+		mcp.WithTitleAnnotation("Attach File"),
+		mcp.WithReadOnlyHintAnnotation(false),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(false),
+		mcp.WithOpenWorldHintAnnotation(false),
+	), srv.handleAttachFile)
+
+	s.AddTool(mcp.NewTool("list_attachments",
+		mcp.WithDescription("List attachments for a message"),
+		mcp.WithString("message_id", mcp.Required(), mcp.Description("Message ID")),
+		mcp.WithTitleAnnotation("List Attachments"),
+		mcp.WithReadOnlyHintAnnotation(true),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(true),
+		mcp.WithOpenWorldHintAnnotation(false),
+	), srv.handleListAttachments)
 }

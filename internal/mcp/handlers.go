@@ -145,6 +145,15 @@ func (s *Server) handleSendMessage(ctx context.Context, request mcp.CallToolRequ
 		"seq":     seq,
 	})
 
+	// Notify resource subscribers.
+	if s.Subscriptions != nil {
+		for _, sid := range s.Subscriptions.Subscribers(roomID) {
+			_ = s.SendNotificationToSpecificClient(sid, mcp.MethodNotificationResourceUpdated, map[string]any{
+				"uri": "rooms://" + roomID + "/messages",
+			})
+		}
+	}
+
 	result := map[string]any{
 		"message_id": msgID,
 		"seq":        seq,

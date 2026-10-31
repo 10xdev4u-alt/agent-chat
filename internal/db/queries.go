@@ -154,6 +154,24 @@ func scanAgent(row *sql.Row) (*Agent, error) {
 	return &a, nil
 }
 
+// ListAgents returns all registered agents.
+func ListAgents(db *sql.DB) ([]Agent, error) {
+	rows, err := db.Query(`SELECT id, name, harness, repo, branch, status, doing, api_key_hash, role, created_at, updated_at FROM agents ORDER BY created_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var agents []Agent
+	for rows.Next() {
+		a, err := scanAgentRows(rows)
+		if err != nil {
+			return nil, err
+		}
+		agents = append(agents, *a)
+	}
+	return agents, rows.Err()
+}
+
 func scanAgentRows(rows *sql.Rows) (*Agent, error) {
 	var a Agent
 	var repo, branch, doing sql.NullString

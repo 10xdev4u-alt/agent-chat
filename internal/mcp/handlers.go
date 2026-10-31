@@ -103,14 +103,41 @@ func (s *Server) handleSendMessage(ctx context.Context, request mcp.CallToolRequ
 		return mcp.NewToolResultError("room_id and body are required"), nil
 	}
 
-	// Parse mentions from args if provided.
+	// Parse mentions from body + args.
 	mentions := request.GetStringSlice("mentions", nil)
+	members, _ := roomspkg.ListMembers(s.DB, roomID)
+	var knownAgents []string
+	for _, m := range members {
+		knownAgents = append(knownAgents, m.AgentID)
+	}
+	parsedMentions := roomspkg.ParseMentions(body, knownAgents)
+	for _, m := range parsedMentions {
+		if !contains(mentions, m) {
+			mentions = append(mentions, m)
+		}
+	}
 	priority := request.GetString("priority", "normal")
 	replyTo := request.GetString("reply_to", "")
+
+	// Loop guard check.
+	if s.LoopGuard != nil {
+		for _, m := range mentions {
+			if err := s.LoopGuard.Check(agentID, m); err != nil {
+				return mcp.NewToolResultError(err.Error()), nil
+			}
+		}
+	}
 
 	msgID, seq, err := roomspkg.SendMessage(s.DB, roomID, agentID, body, mentions, replyTo, priority)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	// Record in loop guard.
+	if s.LoopGuard != nil {
+		for _, m := range mentions {
+			s.LoopGuard.Record(agentID, m)
+		}
 	}
 
 	_ = auditpkg.Log(s.DB, agentID, "send_message", "message", msgID, map[string]any{
@@ -251,4 +278,13 @@ func nullable(v string) any {
 		return nil
 	}
 	return v
+}
+
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }

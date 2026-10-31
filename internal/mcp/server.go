@@ -9,13 +9,15 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 
 	authpkg "github.com/10xdev4u-alt/agent-chat/internal/auth"
+	roomspkg "github.com/10xdev4u-alt/agent-chat/internal/rooms"
 )
 
 // Server wraps the underlying MCP server and HTTP transport for agent-chat.
 type Server struct {
 	*server.MCPServer
 
-	DB *sql.DB
+	DB        *sql.DB
+	LoopGuard *roomspkg.LoopGuard
 
 	// Aliases for compatibility with different callers.
 	MCP                  *server.MCPServer
@@ -36,6 +38,7 @@ func NewServer(db *sql.DB) (*Server, error) {
 	s := &Server{
 		MCPServer: mcpSrv,
 		DB:        db,
+		LoopGuard: roomspkg.NewLoopGuard(12, 10),
 	}
 	s.MCP = mcpSrv
 

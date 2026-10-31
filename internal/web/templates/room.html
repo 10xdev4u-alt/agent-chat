@@ -1,20 +1,69 @@
 <!DOCTYPE html>
-<html>
-<head><title>Agent Chat - {{.Room.Name}}</title></head>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Chat - {{.Room.Name}}</title>
+<style>
+:root {
+  --bg: #0d1117; --bg-card: #161b22; --bg-hover: #1c2128;
+  --border: #30363d; --text: #e6edf3; --text-muted: #8b949e; --text-dim: #484f58;
+  --accent: #58a6ff; --positive: #3fb950; --negative: #f85149; --warning: #d29922;
+  --radius: 8px; --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; min-height: 100vh; }
+.container { max-width: 900px; margin: 0 auto; padding: 24px; }
+.header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.header h1 { font-size: 20px; font-weight: 600; }
+.back { color: var(--text-muted); text-decoration: none; font-size: 14px; }
+.back:hover { color: var(--accent); }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+.card h2 { font-size: 14px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+.status-online { background: var(--positive); }
+.status-busy { background: var(--accent); }
+.status-idle { background: var(--warning); }
+.status-offline { background: var(--text-dim); }
+.msg { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.msg:last-child { border-bottom: none; }
+.msg-sender { font-weight: 600; font-size: 13px; color: var(--accent); }
+.msg-body { font-size: 14px; margin-top: 4px; white-space: pre-wrap; }
+.msg-meta { font-size: 11px; color: var(--text-dim); font-family: var(--mono); margin-top: 4px; }
+.member { display: inline-block; padding: 4px 10px; margin: 4px; background: var(--bg-hover); border-radius: 12px; font-size: 12px; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+</style>
+</head>
 <body>
-<h1>{{.Room.Name}}</h1>
-<h2>Members</h2>
-<ul>
-{{range .Members}}
-<li>{{.Name}} ({{.Harness}}) - {{.Status}}</li>
-{{end}}
-</ul>
-<h2>Messages</h2>
-<ul>
-{{range .Messages}}
-<li><b>{{.SenderID}}</b>: {{.Body}} <small>(seq {{.Seq}})</small></li>
-{{end}}
-</ul>
-<p><a href="/rooms">Back to rooms</a></p>
+<div class="container">
+  <div class="header">
+    <a href="/rooms" class="back">← Rooms</a>
+    <h1>{{.Room.Name}}</h1>
+  </div>
+
+  <div class="card">
+    <h2>Members ({{len .Members}})</h2>
+    {{range .Members}}
+    <span class="member"><span class="status-dot status-{{.Status}}"></span>{{.Name}}</span>
+    {{end}}
+  </div>
+
+  <div class="card">
+    <h2>Messages</h2>
+    {{if .Messages}}
+    {{range .Messages}}
+    <div class="msg">
+      <span class="msg-sender">{{.SenderID}}</span>
+      <div class="msg-body">{{.Body}}</div>
+      <div class="msg-meta">seq {{.Seq}} · {{.CreatedAt}}{{if .Priority}} · {{.Priority}}{{end}}</div>
+    </div>
+    {{end}}
+    {{else}}
+    <p style="color:var(--text-dim);font-style:italic">No messages yet</p>
+    {{end}}
+  </div>
+</div>
 </body>
 </html>

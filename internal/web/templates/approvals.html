@@ -1,13 +1,59 @@
 <!DOCTYPE html>
-<html>
-<head><title>Agent Chat - Approvals</title></head>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Chat - Approvals</title>
+<style>
+:root {
+  --bg: #0d1117; --bg-card: #161b22; --bg-hover: #1c2128;
+  --border: #30363d; --text: #e6edf3; --text-muted: #8b949e; --text-dim: #484f58;
+  --accent: #58a6ff; --positive: #3fb950; --negative: #f85149; --warning: #d29922;
+  --radius: 8px; --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; min-height: 100vh; }
+.container { max-width: 900px; margin: 0 auto; padding: 24px; }
+.header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.header h1 { font-size: 20px; font-weight: 600; }
+.back { color: var(--text-muted); text-decoration: none; font-size: 14px; }
+.back:hover { color: var(--accent); }
+.card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+.risk-low { color: var(--positive); } .risk-medium { color: var(--warning); }
+.risk-high { color: var(--negative); } .risk-critical { color: var(--negative); font-weight: 700; }
+.approval { padding: 16px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 12px; }
+.approval-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.approval-action { font-weight: 600; }
+.approval-meta { font-size: 12px; color: var(--text-muted); }
+.approval-desc { font-size: 14px; margin: 8px 0; color: var(--text-muted); }
+.btn { padding: 6px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; }
+.btn-approve { background: var(--positive); color: #000; }
+.btn-deny { background: var(--negative); color: #fff; }
+.empty { color: var(--text-dim); font-style: italic; padding: 40px; text-align: center; }
+a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
 <body>
-<h1>Pending Approvals</h1>
-<ul>
-{{range .Approvals}}
-<li>{{.RequesterName}} in {{.RoomName}}: {{.Action}} ({{.RiskLevel}}) - {{.Description}}</li>
-{{end}}
-</ul>
-<p><a href="/">Dashboard</a></p>
+<div class="container">
+  <div class="header">
+    <a href="/" class="back">← Dashboard</a>
+    <h1>Pending Approvals</h1>
+  </div>
+  {{if .Approvals}}
+  {{range .Approvals}}
+  <div class="approval">
+    <div class="approval-header">
+      <span class="approval-action">{{.Action}}</span>
+      <span class="risk-{{.RiskLevel}}">{{.RiskLevel}}</span>
+    </div>
+    <div class="approval-meta">{{.RequesterName}} in {{.RoomName}} · {{.CreatedAt}}</div>
+    {{if .Description}}<div class="approval-desc">{{.Description}}</div>{{end}}
+  </div>
+  {{end}}
+  {{else}}
+  <div class="empty">No pending approvals</div>
+  {{end}}
+</div>
 </body>
 </html>

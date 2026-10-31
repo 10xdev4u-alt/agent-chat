@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head><title>Agent Chat - {{.Room.Name}}</title></head>
+<body>
+<h1>{{.Room.Name}}</h1>
+<h2>Members</h2>
+<ul>
+{{range .Members}}
+<li>{{.Name}} ({{.Harness}}) - {{.Status}}</li>
+{{end}}
+</ul>
+<h2>Messages</h2>
+<ul>
+{{range .Messages}}
+<li><b>{{.SenderID}}</b>: {{.Body}} <small>(seq {{.Seq}})</small></li>
+{{end}}
+</ul>
+<p><a href="/rooms">Back to rooms</a></p>
+</body>
+</html>

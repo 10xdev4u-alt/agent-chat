@@ -15,6 +15,7 @@ import (
 	"github.com/10xdev4u-alt/agent-chat/internal/auth"
 	"github.com/10xdev4u-alt/agent-chat/internal/db"
 	"github.com/10xdev4u-alt/agent-chat/internal/mcp"
+	"github.com/10xdev4u-alt/agent-chat/internal/web"
 )
 
 func runServe() {
@@ -42,9 +43,14 @@ func runServe() {
 		os.Exit(1)
 	}
 
+	// Mount web UI on / and MCP on /mcp.
+	mux := http.NewServeMux()
+	mux.Handle("/mcp", srv.HTTPServer)
+	mux.Handle("/", web.Handler(conn))
+
 	httpSrv := &http.Server{
 		Addr:    ":8080",
-		Handler: srv.HTTPServer,
+		Handler: mux,
 	}
 
 	go func() {

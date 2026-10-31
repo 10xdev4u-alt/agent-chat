@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head><title>Agent Chat - Rooms</title></head>
+<body>
+<h1>Rooms</h1>
+<ul>
+{{range .Rooms}}
+<li><a href="/rooms/{{.ID}}">{{.Name}}</a></li>
+{{end}}
+</ul>
+<p><a href="/">Dashboard</a></p>
+</body>
+</html>

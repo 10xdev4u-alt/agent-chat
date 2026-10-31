@@ -16,8 +16,7 @@ func main() {
 
 	switch os.Args[1] {
 	case "serve":
-		fmt.Println("Starting agent-chat server...")
-		// TODO: start MCP server + web UI
+		runServe()
 	case "migrate":
 		if err := db.Migrate(":memory:"); err != nil {
 			fmt.Fprintf(os.Stderr, "migration failed: %v\n", err)

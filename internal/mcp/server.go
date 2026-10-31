@@ -9,6 +9,7 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 
 	authpkg "github.com/10xdev4u-alt/agent-chat/internal/auth"
+	ratelimitpkg "github.com/10xdev4u-alt/agent-chat/internal/ratelimit"
 	roomspkg "github.com/10xdev4u-alt/agent-chat/internal/rooms"
 )
 
@@ -18,6 +19,7 @@ type Server struct {
 
 	DB            *sql.DB
 	LoopGuard     *roomspkg.LoopGuard
+	RateLimiter   *ratelimitpkg.Limiter
 	Subscriptions *SubscriptionManager
 
 	// Aliases for compatibility with different callers.
@@ -40,6 +42,7 @@ func NewServer(db *sql.DB) (*Server, error) {
 		MCPServer:     mcpSrv,
 		DB:            db,
 		LoopGuard:     roomspkg.NewLoopGuard(12, 10),
+		RateLimiter:   ratelimitpkg.NewLimiter(60),
 		Subscriptions: NewSubscriptionManager(),
 	}
 	s.MCP = mcpSrv

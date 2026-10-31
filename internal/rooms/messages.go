@@ -5,24 +5,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	attachmentspkg "github.com/10xdev4u-alt/agent-chat/internal/attachments"
 )
 
 // Message represents a chat message.
 type Message struct {
-	ID        string   `json:"id"`
-	RoomID    string   `json:"room_id"`
-	SenderID  string   `json:"sender_id"`
-	Body      string   `json:"body"`
-	Mentions  []string `json:"mentions,omitempty"`
-	ReplyTo   string   `json:"reply_to,omitempty"`
-	Priority  string   `json:"priority"`
-	Seq       int      `json:"seq"`
-	CreatedAt string   `json:"created_at"`
-	EditedAt  string   `json:"edited_at,omitempty"`
-	DeletedAt string   `json:"deleted_at,omitempty"`
+	ID          string                      `json:"id"`
+	RoomID      string                      `json:"room_id"`
+	SenderID    string                      `json:"sender_id"`
+	Body        string                      `json:"body"`
+	Mentions    []string                    `json:"mentions,omitempty"`
+	ReplyTo     string                      `json:"reply_to,omitempty"`
+	Priority    string                      `json:"priority"`
+	Seq         int                         `json:"seq"`
+	CreatedAt   string                      `json:"created_at"`
+	EditedAt    string                      `json:"edited_at,omitempty"`
+	DeletedAt   string                      `json:"deleted_at,omitempty"`
+	Attachments []attachmentspkg.Attachment `json:"attachments,omitempty"`
 }
 
-func SendMessage(db *sql.DB, roomID, senderID, body string, mentions []string, replyTo, priority string) (string, int, error) {
+func SendMessage(db *sql.DB, roomID, senderID, body string, mentions []string, replyTo, priority string, attachmentIDs ...any) (string, int, error) {
 	if body == "" {
 		return "", 0, fmt.Errorf("message body is required")
 	}
@@ -36,6 +39,26 @@ func SendMessage(db *sql.DB, roomID, senderID, body string, mentions []string, r
 	}
 	if priority == "" {
 		priority = "normal"
+	}
+
+	// Normalize optional attachment IDs.
+	var attachIDs []string
+	for _, a := range attachmentIDs {
+		switch v := a.(type) {
+		case nil:
+		case string:
+			if v != "" {
+				attachIDs = append(attachIDs, v)
+			}
+		case []string:
+			attachIDs = append(attachIDs, v...)
+		case []any:
+			for _, x := range v {
+				if xs, ok := x.(string); ok && xs != "" {
+					attachIDs = append(attachIDs, xs)
+				}
+			}
+		}
 	}
 
 	// Get next seq.
@@ -68,6 +91,9 @@ func SendMessage(db *sql.DB, roomID, senderID, body string, mentions []string, r
 	if err != nil {
 		return "", 0, fmt.Errorf("insert message: %w", err)
 	}
+	for _, aid := range attachIDs {
+		_, _ = db.Exec(`UPDATE attachments SET message_id = ? WHERE id = ?`, id, aid)
+	}
 	return id, seq, nil
 }
 
@@ -89,7 +115,12 @@ func ReadMessages(db *sql.DB, roomID string, afterSeq int, limit int) ([]Message
 		return nil, err
 	}
 	defer rows.Close()
-	return scanMessages(rows)
+	msgs, err := scanMessages(rows)
+	if err != nil {
+		return nil, err
+	}
+	populateAttachments(db, msgs)
+	return msgs, nil
 }
 
 func SearchMessages(db *sql.DB, roomID, query string, limit int) ([]Message, error) {
@@ -105,7 +136,12 @@ func SearchMessages(db *sql.DB, roomID, query string, limit int) ([]Message, err
 		return nil, err
 	}
 	defer rows.Close()
-	return scanMessages(rows)
+	msgs, err := scanMessages(rows)
+	if err != nil {
+		return nil, err
+	}
+	populateAttachments(db, msgs)
+	return msgs, nil
 }
 
 func GetMessage(db *sql.DB, id string) (*Message, error) {
@@ -118,6 +154,7 @@ func GetMessage(db *sql.DB, id string) (*Message, error) {
 	if len(msgs) == 0 {
 		return nil, fmt.Errorf("message not found: %s", id)
 	}
+	populateAttachments(db, msgs)
 	return &msgs[0], nil
 }
 
@@ -146,6 +183,15 @@ func GetReadCursor(db *sql.DB, agentID, roomID string) (int, error) {
 		return 0, err
 	}
 	return seq, nil
+}
+
+func populateAttachments(db *sql.DB, msgs []Message) {
+	for i := range msgs {
+		atts, err := attachmentspkg.ListAttachments(db, msgs[i].ID)
+		if err == nil {
+			msgs[i].Attachments = atts
+		}
+	}
 }
 
 func scanMessages(rows *sql.Rows) ([]Message, error) {

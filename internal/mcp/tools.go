@@ -109,6 +109,27 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithOpenWorldHintAnnotation(false),
 	), srv.handleSearchMessages)
 
+	s.AddTool(mcp.NewTool("edit_message",
+		mcp.WithDescription("Edit a message body"),
+		mcp.WithString("message_id", mcp.Required(), mcp.Description("Message ID")),
+		mcp.WithString("body", mcp.Required(), mcp.Description("New message body")),
+		mcp.WithTitleAnnotation("Edit Message"),
+		mcp.WithReadOnlyHintAnnotation(false),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(false),
+		mcp.WithOpenWorldHintAnnotation(false),
+	), srv.handleEditMessage)
+
+	s.AddTool(mcp.NewTool("delete_message",
+		mcp.WithDescription("Soft-delete a message"),
+		mcp.WithString("message_id", mcp.Required(), mcp.Description("Message ID")),
+		mcp.WithTitleAnnotation("Delete Message"),
+		mcp.WithReadOnlyHintAnnotation(false),
+		mcp.WithDestructiveHintAnnotation(true),
+		mcp.WithIdempotentHintAnnotation(true),
+		mcp.WithOpenWorldHintAnnotation(false),
+	), srv.handleDeleteMessage)
+
 	s.AddTool(mcp.NewTool("request_approval",
 		mcp.WithDescription("Request approval for an action"),
 		mcp.WithString("room_id", mcp.Required(), mcp.Description("Room ID")),

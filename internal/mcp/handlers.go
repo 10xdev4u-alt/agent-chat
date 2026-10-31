@@ -235,6 +235,77 @@ func (s *Server) handleSearchMessages(ctx context.Context, request mcp.CallToolR
 	return mcp.NewToolResultText(string(b)), nil
 }
 
+func (s *Server) handleEditMessage(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	agentID, ok := s.agentIDFromContext(ctx)
+	if !ok {
+		return mcp.NewToolResultError("unauthorized"), nil
+	}
+	if s.RateLimiter != nil && !s.RateLimiter.Allow(agentID) {
+		return mcp.NewToolResultError("rate limit exceeded"), nil
+	}
+	messageID := request.GetString("message_id", "")
+	body := request.GetString("body", "")
+	if messageID == "" || body == "" {
+		return mcp.NewToolResultError("message_id and body are required"), nil
+	}
+
+	msg, _ := roomspkg.GetMessage(s.DB, messageID)
+	if err := roomspkg.EditMessage(s.DB, messageID, agentID, body); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	meta := map[string]any{}
+	if msg != nil {
+		meta["room_id"] = msg.RoomID
+	}
+	_ = auditpkg.Log(s.DB, agentID, "message.edited", "message", messageID, meta)
+
+	if s.Subscriptions != nil && msg != nil {
+		for _, sid := range s.Subscriptions.Subscribers(msg.RoomID) {
+			_ = s.SendNotificationToSpecificClient(sid, mcp.MethodNotificationResourceUpdated, map[string]any{
+				"uri": "rooms://" + msg.RoomID + "/messages",
+			})
+		}
+	}
+
+	return mcp.NewToolResultText(`{"ok":true}`), nil
+}
+
+func (s *Server) handleDeleteMessage(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	agentID, ok := s.agentIDFromContext(ctx)
+	if !ok {
+		return mcp.NewToolResultError("unauthorized"), nil
+	}
+	if s.RateLimiter != nil && !s.RateLimiter.Allow(agentID) {
+		return mcp.NewToolResultError("rate limit exceeded"), nil
+	}
+	messageID := request.GetString("message_id", "")
+	if messageID == "" {
+		return mcp.NewToolResultError("message_id is required"), nil
+	}
+
+	msg, _ := roomspkg.GetMessage(s.DB, messageID)
+	if err := roomspkg.DeleteMessage(s.DB, messageID, agentID); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	meta := map[string]any{}
+	if msg != nil {
+		meta["room_id"] = msg.RoomID
+	}
+	_ = auditpkg.Log(s.DB, agentID, "message.deleted", "message", messageID, meta)
+
+	if s.Subscriptions != nil && msg != nil {
+		for _, sid := range s.Subscriptions.Subscribers(msg.RoomID) {
+			_ = s.SendNotificationToSpecificClient(sid, mcp.MethodNotificationResourceUpdated, map[string]any{
+				"uri": "rooms://" + msg.RoomID + "/messages",
+			})
+		}
+	}
+
+	return mcp.NewToolResultText(`{"ok":true}`), nil
+}
+
 func (s *Server) handleRequestApproval(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	agentID, ok := s.agentIDFromContext(ctx)
 	if !ok {

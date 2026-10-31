@@ -79,12 +79,15 @@ CREATE TABLE IF NOT EXISTS audit_events (
 );
 
 CREATE TABLE IF NOT EXISTS attachments (
-    id          TEXT PRIMARY KEY,
-    message_id  TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-    filename    TEXT NOT NULL,
-    size        INTEGER NOT NULL,
-    path        TEXT NOT NULL,
-    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    id           TEXT PRIMARY KEY,
+    message_id   TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    filename     TEXT NOT NULL,
+    content_type TEXT,
+    size_bytes   INTEGER NOT NULL,
+    storage_path TEXT NOT NULL,
+    created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    size         INTEGER,
+    path         TEXT
 );
 
 -- Indexes

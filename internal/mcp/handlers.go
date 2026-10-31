@@ -9,12 +9,16 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 
 	approvalspkg "github.com/10xdev4u-alt/agent-chat/internal/approvals"
+	attachmentspkg "github.com/10xdev4u-alt/agent-chat/internal/attachments"
 	auditpkg "github.com/10xdev4u-alt/agent-chat/internal/audit"
 	dbpkg "github.com/10xdev4u-alt/agent-chat/internal/db"
 	roomspkg "github.com/10xdev4u-alt/agent-chat/internal/rooms"
 )
 
 func (s *Server) handleRegister(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if s.RateLimiter != nil && !s.RateLimiter.Allow("register") {
+		return mcp.NewToolResultError("rate limit exceeded"), nil
+	}
 	name := request.GetString("name", "")
 	harness := request.GetString("harness", "")
 	repo := request.GetString("repo", "")
@@ -53,6 +57,9 @@ func (s *Server) handleJoinRoom(ctx context.Context, request mcp.CallToolRequest
 	agentID, ok := s.agentIDFromContext(ctx)
 	if !ok {
 		return mcp.NewToolResultError("unauthorized"), nil
+	}
+	if s.RateLimiter != nil && !s.RateLimiter.Allow(agentID) {
+		return mcp.NewToolResultError("rate limit exceeded"), nil
 	}
 	roomID := request.GetString("room_id", "")
 	if roomID == "" {
@@ -99,6 +106,9 @@ func (s *Server) handleSendMessage(ctx context.Context, request mcp.CallToolRequ
 	if !ok {
 		return mcp.NewToolResultError("unauthorized"), nil
 	}
+	if s.RateLimiter != nil && !s.RateLimiter.Allow(agentID) {
+		return mcp.NewToolResultError("rate limit exceeded"), nil
+	}
 	roomID := request.GetString("room_id", "")
 	body := request.GetString("body", "")
 	if roomID == "" || body == "" {
@@ -120,6 +130,7 @@ func (s *Server) handleSendMessage(ctx context.Context, request mcp.CallToolRequ
 	}
 	priority := request.GetString("priority", "normal")
 	replyTo := request.GetString("reply_to", "")
+	attachmentIDs := request.GetStringSlice("attachment_ids", nil)
 
 	// Loop guard check.
 	if s.LoopGuard != nil {
@@ -130,7 +141,7 @@ func (s *Server) handleSendMessage(ctx context.Context, request mcp.CallToolRequ
 		}
 	}
 
-	msgID, seq, err := roomspkg.SendMessage(s.DB, roomID, agentID, body, mentions, replyTo, priority)
+	msgID, seq, err := roomspkg.SendMessage(s.DB, roomID, agentID, body, mentions, replyTo, priority, attachmentIDs)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -298,4 +309,55 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func (s *Server) handleAttachFile(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	agentID, ok := s.agentIDFromContext(ctx)
+	if !ok {
+		return mcp.NewToolResultError("unauthorized"), nil
+	}
+	messageID := request.GetString("message_id", "")
+	filename := request.GetString("filename", "")
+	contentType := request.GetString("content_type", "")
+	storagePath := request.GetString("storage_path", "")
+	sizeBytes := request.GetInt("size_bytes", 0)
+	if messageID == "" || filename == "" || storagePath == "" {
+		return mcp.NewToolResultError("message_id, filename and storage_path are required"), nil
+	}
+	attID, err := attachmentspkg.CreateAttachment(s.DB, messageID, filename, contentType, int64(sizeBytes), storagePath)
+	if err != nil {
+		return nil, fmt.Errorf("attach file: %w", err)
+	}
+	_ = auditpkg.Log(s.DB, agentID, "attachment.created", "attachment", attID, map[string]any{
+		"message_id": messageID,
+	})
+	result := map[string]any{"attachment_id": attID}
+	b, _ := json.Marshal(result)
+	return mcp.NewToolResultText(string(b)), nil
+}
+
+func (s *Server) handleListAttachments(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	_, ok := s.agentIDFromContext(ctx)
+	if !ok {
+		return mcp.NewToolResultError("unauthorized"), nil
+	}
+	messageID := request.GetString("message_id", "")
+	if messageID == "" {
+		return mcp.NewToolResultError("message_id is required"), nil
+	}
+	atts, err := attachmentspkg.ListAttachments(s.DB, messageID)
+	if err != nil {
+		return nil, fmt.Errorf("list attachments: %w", err)
+	}
+	out := make([]map[string]any, 0, len(atts))
+	for _, a := range atts {
+		out = append(out, map[string]any{
+			"id":           a.ID,
+			"filename":     a.Filename,
+			"content_type": a.ContentType,
+			"size_bytes":   a.SizeBytes,
+		})
+	}
+	b, _ := json.Marshal(out)
+	return mcp.NewToolResultText(string(b)), nil
 }

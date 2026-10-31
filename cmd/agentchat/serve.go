@@ -15,7 +15,7 @@ import (
 	"github.com/10xdev4u-alt/agent-chat/internal/auth"
 	"github.com/10xdev4u-alt/agent-chat/internal/db"
 	"github.com/10xdev4u-alt/agent-chat/internal/mcp"
-	relaypkg "github.com/10xdev4u-alt/agent-chat/internal/relay"
+	"github.com/10xdev4u-alt/agent-chat/internal/oauth"
 	"github.com/10xdev4u-alt/agent-chat/internal/web"
 )
 
@@ -37,6 +37,7 @@ func runServe() {
 	}
 
 	auth.SetDB(conn)
+	oauth.SetDB(conn)
 
 	srv, err := mcp.NewServer(conn)
 	if err != nil {
@@ -44,13 +45,14 @@ func runServe() {
 		os.Exit(1)
 	}
 
-	relay := relaypkg.New(conn)
-	srv.Relay = relay
-
 	// Mount web UI on / and MCP on /mcp.
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", srv.HTTPServer)
-	mux.Handle("/relay/ws", relay)
+	mux.Handle("/relay/ws", srv.Relay)
+	mux.HandleFunc("/.well-known/oauth-authorization-server", oauth.HandleDiscovery)
+	mux.HandleFunc("/oauth/token", oauth.HandleToken)
+	mux.HandleFunc("/oauth/authorize", oauth.HandleAuthorize)
+	mux.HandleFunc("/oauth/register", oauth.HandleRegister)
 	mux.Handle("/", web.Handler(conn))
 
 	httpSrv := &http.Server{

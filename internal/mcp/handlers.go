@@ -61,6 +61,7 @@ func (s *Server) handleJoinRoom(ctx context.Context, request mcp.CallToolRequest
 	if err := roomspkg.JoinRoom(s.DB, roomID, agentID, "member"); err != nil {
 		return nil, fmt.Errorf("join room: %w", err)
 	}
+	_ = auditpkg.Log(s.DB, agentID, "room.joined", "room", roomID, nil)
 	return mcp.NewToolResultText(`{"ok":true}`), nil
 }
 
@@ -76,6 +77,7 @@ func (s *Server) handleLeaveRoom(ctx context.Context, request mcp.CallToolReques
 	if err := roomspkg.LeaveRoom(s.DB, roomID, agentID); err != nil {
 		return nil, fmt.Errorf("leave room: %w", err)
 	}
+	_ = auditpkg.Log(s.DB, agentID, "room.left", "room", roomID, nil)
 	return mcp.NewToolResultText(`{"ok":true}`), nil
 }
 
@@ -140,7 +142,7 @@ func (s *Server) handleSendMessage(ctx context.Context, request mcp.CallToolRequ
 		}
 	}
 
-	_ = auditpkg.Log(s.DB, agentID, "send_message", "message", msgID, map[string]any{
+	_ = auditpkg.Log(s.DB, agentID, "message.sent", "message", msgID, map[string]any{
 		"room_id": roomID,
 		"seq":     seq,
 	})

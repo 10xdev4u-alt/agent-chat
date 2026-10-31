@@ -155,4 +155,33 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithIdempotentHintAnnotation(true),
 		mcp.WithOpenWorldHintAnnotation(false),
 	), srv.handleListAttachments)
+
+	s.AddTool(mcp.NewTool("connect_peer",
+		mcp.WithDescription("Connect to a remote agent-chat instance"),
+		mcp.WithString("peer_url", mcp.Required(), mcp.Description("Peer WebSocket URL")),
+		mcp.WithTitleAnnotation("Connect Peer"),
+		mcp.WithReadOnlyHintAnnotation(false),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(false),
+		mcp.WithOpenWorldHintAnnotation(true),
+	), srv.handleConnectPeer)
+
+	s.AddTool(mcp.NewTool("list_peers",
+		mcp.WithDescription("List connected peers"),
+		mcp.WithTitleAnnotation("List Peers"),
+		mcp.WithReadOnlyHintAnnotation(true),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(true),
+		mcp.WithOpenWorldHintAnnotation(false),
+	), srv.handleListPeers)
+
+	s.AddTool(mcp.NewTool("disconnect_peer",
+		mcp.WithDescription("Disconnect from a remote agent-chat instance"),
+		mcp.WithString("peer_url", mcp.Required(), mcp.Description("Peer WebSocket URL")),
+		mcp.WithTitleAnnotation("Disconnect Peer"),
+		mcp.WithReadOnlyHintAnnotation(false),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(true),
+		mcp.WithOpenWorldHintAnnotation(false),
+	), srv.handleDisconnectPeer)
 }

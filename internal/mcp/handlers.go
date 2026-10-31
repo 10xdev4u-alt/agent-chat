@@ -12,6 +12,7 @@ import (
 	attachmentspkg "github.com/10xdev4u-alt/agent-chat/internal/attachments"
 	auditpkg "github.com/10xdev4u-alt/agent-chat/internal/audit"
 	dbpkg "github.com/10xdev4u-alt/agent-chat/internal/db"
+	relaypkg "github.com/10xdev4u-alt/agent-chat/internal/relay"
 	roomspkg "github.com/10xdev4u-alt/agent-chat/internal/rooms"
 )
 
@@ -359,5 +360,43 @@ func (s *Server) handleListAttachments(ctx context.Context, request mcp.CallTool
 		})
 	}
 	b, _ := json.Marshal(out)
+	return mcp.NewToolResultText(string(b)), nil
+}
+
+func (s *Server) handleConnectPeer(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	peerURL := request.GetString("peer_url", "")
+	if peerURL == "" {
+		return mcp.NewToolResultError("peer_url is required"), nil
+	}
+	if s.Relay == nil {
+		s.Relay = relaypkg.New(s.DB)
+	}
+	if err := s.Relay.Connect(peerURL); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	b, _ := json.Marshal(map[string]any{"ok": true, "peers": s.Relay.ListPeers()})
+	return mcp.NewToolResultText(string(b)), nil
+}
+
+func (s *Server) handleListPeers(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if s.Relay == nil {
+		s.Relay = relaypkg.New(s.DB)
+	}
+	b, _ := json.Marshal(s.Relay.ListPeers())
+	return mcp.NewToolResultText(string(b)), nil
+}
+
+func (s *Server) handleDisconnectPeer(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	peerURL := request.GetString("peer_url", "")
+	if peerURL == "" {
+		return mcp.NewToolResultError("peer_url is required"), nil
+	}
+	if s.Relay == nil {
+		s.Relay = relaypkg.New(s.DB)
+	}
+	if err := s.Relay.Disconnect(peerURL); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	b, _ := json.Marshal(map[string]any{"ok": true, "peers": s.Relay.ListPeers()})
 	return mcp.NewToolResultText(string(b)), nil
 }

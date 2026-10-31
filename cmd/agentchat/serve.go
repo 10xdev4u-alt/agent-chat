@@ -48,6 +48,7 @@ func runServe() {
 	// Mount web UI on / and MCP on /mcp.
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", srv.HTTPServer)
+	mux.Handle("/relay/ws", srv.Relay)
 	mux.HandleFunc("/.well-known/oauth-authorization-server", oauth.HandleDiscovery)
 	mux.HandleFunc("/oauth/token", oauth.HandleToken)
 	mux.HandleFunc("/oauth/authorize", oauth.HandleAuthorize)

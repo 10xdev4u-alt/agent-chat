@@ -16,8 +16,9 @@ import (
 type Server struct {
 	*server.MCPServer
 
-	DB        *sql.DB
-	LoopGuard *roomspkg.LoopGuard
+	DB            *sql.DB
+	LoopGuard     *roomspkg.LoopGuard
+	Subscriptions *SubscriptionManager
 
 	// Aliases for compatibility with different callers.
 	MCP                  *server.MCPServer
@@ -36,9 +37,10 @@ func NewServer(db *sql.DB) (*Server, error) {
 	)
 
 	s := &Server{
-		MCPServer: mcpSrv,
-		DB:        db,
-		LoopGuard: roomspkg.NewLoopGuard(12, 10),
+		MCPServer:     mcpSrv,
+		DB:            db,
+		LoopGuard:     roomspkg.NewLoopGuard(12, 10),
+		Subscriptions: NewSubscriptionManager(),
 	}
 	s.MCP = mcpSrv
 

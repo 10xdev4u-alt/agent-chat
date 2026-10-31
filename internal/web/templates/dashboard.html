@@ -1,21 +1,121 @@
 <!DOCTYPE html>
-<html>
-<head><title>Agent Chat - Dashboard</title></head>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Chat</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --bg-card: #161b22;
+  --bg-hover: #1c2128;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --text-dim: #484f58;
+  --accent: #58a6ff;
+  --positive: #3fb950;
+  --negative: #f85149;
+  --warning: #d29922;
+  --radius: 8px;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+.container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 32px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
+}
+.header h1 { font-size: 20px; font-weight: 600; }
+.header .stats { display: flex; gap: 16px; color: var(--text-muted); font-size: 13px; }
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
+}
+.card h2 { font-size: 14px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.agent-item {
+  display: flex; align-items: center; gap: 12px; padding: 12px;
+  border-radius: 6px; transition: background 0.15s;
+}
+.agent-item:hover { background: var(--bg-hover); }
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.status-online { background: var(--positive); }
+.status-busy { background: var(--accent); }
+.status-idle { background: var(--warning); }
+.status-offline { background: var(--text-dim); }
+.status-stuck { background: var(--negative); }
+.agent-info { flex: 1; min-width: 0; }
+.agent-name { font-weight: 600; font-size: 14px; }
+.agent-meta { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agent-doing { font-size: 12px; color: var(--text-dim); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.room-link { color: var(--accent); text-decoration: none; }
+.room-link:hover { text-decoration: underline; }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 12px;
+  font-size: 11px; font-weight: 600; font-family: var(--mono);
+}
+.badge-warning { background: rgba(210,153,34,0.15); color: var(--warning); }
+.empty { color: var(--text-dim); font-style: italic; padding: 20px; text-align: center; }
+a { color: var(--accent); }
+</style>
+</head>
 <body>
-<h1>Agent Chat Dashboard</h1>
-<p>Pending approvals: {{.PendingCount}}</p>
-<h2>Agents</h2>
-<ul>
-{{range .Agents}}
-<li>{{.Name}} ({{.Harness}}) - {{.Status}} {{if .Doing}}- {{.Doing}}{{end}} {{if .Repo}}{{.Repo}}@{{.Branch}}{{end}}</li>
-{{end}}
-</ul>
-<h2>Rooms</h2>
-<ul>
-{{range .Rooms}}
-<li><a href="/rooms/{{.ID}}">{{.Name}}</a></li>
-{{end}}
-</ul>
-<p><a href="/approvals">Approvals</a></p>
+<div class="container">
+  <div class="header">
+    <h1>Agent Chat</h1>
+    <div class="stats">
+      <span>{{len .Agents}} agents</span>
+      <span>{{len .Rooms}} rooms</span>
+      {{if .PendingCount}}<span class="badge badge-warning">{{.PendingCount}} pending</span>{{end}}
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Agents</h2>
+      {{if .Agents}}
+      {{range .Agents}}
+      <div class="agent-item">
+        <span class="status-dot status-{{.Status}}"></span>
+        <div class="agent-info">
+          <div class="agent-name">{{.Name}}</div>
+          <div class="agent-meta">{{.Harness}}{{if .Repo}} · {{.Repo}}@{{.Branch}}{{end}}</div>
+          {{if .Doing}}<div class="agent-doing">{{.Doing}}</div>{{end}}
+        </div>
+      </div>
+      {{end}}
+      {{else}}
+      <div class="empty">No agents connected</div>
+      {{end}}
+    </div>
+
+    <div class="card">
+      <h2>Rooms</h2>
+      {{if .Rooms}}
+      <ul style="list-style:none">
+      {{range .Rooms}}
+      <li style="padding:8px 0;border-bottom:1px solid var(--border)">
+        <a href="/rooms/{{.ID}}" class="room-link">{{.Name}}</a>
+      </li>
+      {{end}}
+      </ul>
+      {{else}}
+      <div class="empty">No rooms yet</div>
+      {{end}}
+      <p style="margin-top:12px"><a href="/approvals">View approvals →</a></p>
+    </div>
+  </div>
+</div>
 </body>
 </html>

@@ -12,6 +12,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"github.com/10xdev4u-alt/agent-chat/internal/auth"
 	"github.com/10xdev4u-alt/agent-chat/internal/db"
 	"github.com/10xdev4u-alt/agent-chat/internal/mcp"
 )
@@ -32,6 +33,8 @@ func runServe() {
 		fmt.Fprintf(os.Stderr, "open db: %v\n", err)
 		os.Exit(1)
 	}
+
+	auth.SetDB(conn)
 
 	srv, err := mcp.NewServer(conn)
 	if err != nil {

@@ -2,12 +2,13 @@ package mcp
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/mark3labs/mcp-go/mcp"
+
+	dbpkg "github.com/10xdev4u-alt/agent-chat/internal/db"
 )
 
 func (s *Server) handleRegister(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -20,16 +21,9 @@ func (s *Server) handleRegister(ctx context.Context, request mcp.CallToolRequest
 		return mcp.NewToolResultError("name and harness are required"), nil
 	}
 
-	agentID := uuid.New().String()
-	apiKey := uuid.New().String()
-	hash := sha256Hex(apiKey)
-
-	_, err := s.DB.ExecContext(ctx,
-		`INSERT INTO agents (id, name, harness, repo, branch, api_key_hash, status) VALUES (?, ?, ?, ?, ?, ?, 'online')`,
-		agentID, name, harness, nullable(repo), nullable(branch), hash,
-	)
+	agentID, apiKey, err := dbpkg.CreateAgent(s.DB, name, harness, repo, branch, "agent")
 	if err != nil {
-		return nil, fmt.Errorf("insert agent: %w", err)
+		return nil, fmt.Errorf("create agent: %w", err)
 	}
 
 	sessionID := uuid.New().String()
@@ -54,7 +48,15 @@ func nullable(v string) any {
 	return v
 }
 
-func sha256Hex(s string) string {
-	h := sha256.Sum256([]byte(s))
-	return fmt.Sprintf("%x", h)
+// Helper to get agent ID from context (set by auth middleware).
+func (s *Server) agentIDFromContext(ctx context.Context) (string, bool) {
+	token, ok := TokenFromContext(ctx)
+	if !ok {
+		return "", false
+	}
+	agent, err := dbpkg.GetAgentByKey(s.DB, token)
+	if err != nil || agent == nil {
+		return "", false
+	}
+	return agent.ID, true
 }

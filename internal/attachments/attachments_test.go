@@ -32,24 +32,11 @@ func setupDB(t *testing.T) *sql.DB {
 
 func seedMessage(t *testing.T, db *sql.DB) string {
 	t.Helper()
-	// disable FK enforcement for seeding by direct inserts with valid parents
-	_, err := db.Exec(`INSERT INTO agents (id, name, harness) VALUES ('a1','a','h')`)
-	if err != nil {
-		// ignore duplicate
-	}
-	_, err = db.Exec(`INSERT INTO rooms (id, name, owner_id) VALUES ('r1','r','a1')`)
-	if err != nil {
-		// ignore duplicate
-	}
-	_, err = db.Exec(`INSERT INTO room_members (room_id, agent_id, role) VALUES ('r1','a1','owner')`)
-	if err != nil {
-		// ignore
-	}
+	_, _ = db.Exec(`INSERT INTO agents (id, name, harness) VALUES ('a1','a','h')`)
+	_, _ = db.Exec(`INSERT INTO rooms (id, name, owner_id) VALUES ('r1','r','a1')`)
+	_, _ = db.Exec(`INSERT INTO room_members (room_id, agent_id, role) VALUES ('r1','a1','owner')`)
 	msgID := "m1"
-	_, err = db.Exec(`INSERT INTO messages (id, room_id, sender_id, body, mentions, priority, seq) VALUES (?,?,?,?,?,?,?)`, msgID, "r1", "a1", "hi", "[]", "normal", 1)
-	if err != nil {
-		// maybe exists; generate unique
-	}
+	_, _ = db.Exec(`INSERT INTO messages (id, room_id, sender_id, body, mentions, priority, seq) VALUES (?,?,?,?,?,?,?)`, msgID, "r1", "a1", "hi", "[]", "normal", 1)
 	return msgID
 }
 

@@ -177,6 +177,7 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithOpenWorldHintAnnotation(false),
 	), srv.handleListAttachments)
 
+
 	s.AddTool(mcp.NewTool("connect_peer",
 		mcp.WithDescription("Connect to a remote agent-chat instance"),
 		mcp.WithString("peer_url", mcp.Required(), mcp.Description("Peer WebSocket URL")),

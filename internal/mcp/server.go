@@ -48,6 +48,5 @@ func NewServer(db *sql.DB) (*Server, error) {
 	s.StreamableHTTP = httpSrv
 	s.HTTP = httpSrv
 
-
 	return s, nil
 }

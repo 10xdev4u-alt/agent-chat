@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -46,18 +47,29 @@ func runServe() {
 	}
 
 	// Mount web UI on / and MCP on /mcp.
-	mux := http.NewServeMux()
-	mux.Handle("/mcp", srv.HTTPServer)
-	mux.Handle("/relay/ws", srv.Relay)
-	mux.HandleFunc("/.well-known/oauth-authorization-server", oauth.HandleDiscovery)
-	mux.HandleFunc("/oauth/token", oauth.HandleToken)
-	mux.HandleFunc("/oauth/authorize", oauth.HandleAuthorize)
-	mux.HandleFunc("/oauth/register", oauth.HandleRegister)
-	mux.Handle("/", web.Handler(conn))
+	webHandler := web.Handler(conn)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/mcp" || strings.HasPrefix(r.URL.Path, "/mcp/"):
+			srv.HTTPServer.ServeHTTP(w, r)
+		case r.URL.Path == "/relay/ws":
+			srv.Relay.ServeHTTP(w, r)
+		case r.URL.Path == "/.well-known/oauth-authorization-server":
+			oauth.HandleDiscovery(w, r)
+		case r.URL.Path == "/oauth/token":
+			oauth.HandleToken(w, r)
+		case r.URL.Path == "/oauth/authorize":
+			oauth.HandleAuthorize(w, r)
+		case r.URL.Path == "/oauth/register":
+			oauth.HandleRegister(w, r)
+		default:
+			webHandler.ServeHTTP(w, r)
+		}
+	})
 
 	httpSrv := &http.Server{
 		Addr:    ":8080",
-		Handler: mux,
+		Handler: handler,
 	}
 
 	go func() {

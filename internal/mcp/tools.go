@@ -5,8 +5,6 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-func boolPtr(v bool) *bool { return &v }
-
 func registerTools(s *server.MCPServer, srv *Server) {
 	s.AddTool(mcp.NewTool("register",
 		mcp.WithDescription("Register a new agent and obtain credentials"),
@@ -21,23 +19,6 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithOpenWorldHintAnnotation(false),
 	), srv.handleRegister)
 
-	stubTools := []struct {
-		name string
-		desc string
-	}{
-		{"list_rooms", "List all rooms"},
-		{"join_room", "Join a room"},
-		{"leave_room", "Leave a room"},
-		{"list_members", "List room members"},
-		{"send_message", "Send a message"},
-		{"read_messages", "Read messages"},
-		{"update_status", "Update agent status"},
-		{"search_messages", "Search messages"},
-		{"request_approval", "Request approval"},
-		{"check_approval", "Check approval status"},
-	}
-	_ = stubTools
-
 	// list_rooms
 	s.AddTool(mcp.NewTool("list_rooms",
 		mcp.WithDescription("List all rooms"),
@@ -46,7 +27,7 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(true),
 		mcp.WithOpenWorldHintAnnotation(false),
-	), srv.notImplemented)
+	), srv.handleListRooms)
 
 	s.AddTool(mcp.NewTool("join_room",
 		mcp.WithDescription("Join a room"),
@@ -56,7 +37,7 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(true),
 		mcp.WithOpenWorldHintAnnotation(false),
-	), srv.notImplemented)
+	), srv.handleJoinRoom)
 
 	s.AddTool(mcp.NewTool("leave_room",
 		mcp.WithDescription("Leave a room"),
@@ -66,7 +47,7 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(true),
 		mcp.WithOpenWorldHintAnnotation(false),
-	), srv.notImplemented)
+	), srv.handleLeaveRoom)
 
 	s.AddTool(mcp.NewTool("list_members",
 		mcp.WithDescription("List room members"),
@@ -76,7 +57,7 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(true),
 		mcp.WithOpenWorldHintAnnotation(false),
-	), srv.notImplemented)
+	), srv.handleListMembers)
 
 	s.AddTool(mcp.NewTool("send_message",
 		mcp.WithDescription("Send a message to a room"),
@@ -90,7 +71,7 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(false),
 		mcp.WithOpenWorldHintAnnotation(false),
-	), srv.notImplemented)
+	), srv.handleSendMessage)
 
 	s.AddTool(mcp.NewTool("read_messages",
 		mcp.WithDescription("Read messages from a room"),
@@ -102,7 +83,7 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(true),
 		mcp.WithOpenWorldHintAnnotation(false),
-	), srv.notImplemented)
+	), srv.handleReadMessages)
 
 	s.AddTool(mcp.NewTool("update_status",
 		mcp.WithDescription("Update agent status"),
@@ -113,7 +94,7 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(true),
 		mcp.WithOpenWorldHintAnnotation(false),
-	), srv.notImplemented)
+	), srv.handleUpdateStatus)
 
 	s.AddTool(mcp.NewTool("search_messages",
 		mcp.WithDescription("Search messages in a room"),
@@ -125,7 +106,7 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(true),
 		mcp.WithOpenWorldHintAnnotation(false),
-	), srv.notImplemented)
+	), srv.handleSearchMessages)
 
 	s.AddTool(mcp.NewTool("request_approval",
 		mcp.WithDescription("Request approval for an action"),
@@ -138,7 +119,7 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(false),
 		mcp.WithOpenWorldHintAnnotation(false),
-	), srv.notImplemented)
+	), srv.handleRequestApproval)
 
 	s.AddTool(mcp.NewTool("check_approval",
 		mcp.WithDescription("Check approval status"),
@@ -148,5 +129,5 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithIdempotentHintAnnotation(true),
 		mcp.WithOpenWorldHintAnnotation(false),
-	), srv.notImplemented)
+	), srv.handleCheckApproval)
 }

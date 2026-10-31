@@ -12,10 +12,14 @@ import (
 	attachmentspkg "github.com/10xdev4u-alt/agent-chat/internal/attachments"
 	auditpkg "github.com/10xdev4u-alt/agent-chat/internal/audit"
 	dbpkg "github.com/10xdev4u-alt/agent-chat/internal/db"
+	relaypkg "github.com/10xdev4u-alt/agent-chat/internal/relay"
 	roomspkg "github.com/10xdev4u-alt/agent-chat/internal/rooms"
 )
 
 func (s *Server) handleRegister(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if s.RateLimiter != nil && !s.RateLimiter.Allow("register") {
+		return mcp.NewToolResultError("rate limit exceeded"), nil
+	}
 	name := request.GetString("name", "")
 	harness := request.GetString("harness", "")
 	repo := request.GetString("repo", "")
@@ -54,6 +58,9 @@ func (s *Server) handleJoinRoom(ctx context.Context, request mcp.CallToolRequest
 	agentID, ok := s.agentIDFromContext(ctx)
 	if !ok {
 		return mcp.NewToolResultError("unauthorized"), nil
+	}
+	if s.RateLimiter != nil && !s.RateLimiter.Allow(agentID) {
+		return mcp.NewToolResultError("rate limit exceeded"), nil
 	}
 	roomID := request.GetString("room_id", "")
 	if roomID == "" {
@@ -99,6 +106,9 @@ func (s *Server) handleSendMessage(ctx context.Context, request mcp.CallToolRequ
 	agentID, ok := s.agentIDFromContext(ctx)
 	if !ok {
 		return mcp.NewToolResultError("unauthorized"), nil
+	}
+	if s.RateLimiter != nil && !s.RateLimiter.Allow(agentID) {
+		return mcp.NewToolResultError("rate limit exceeded"), nil
 	}
 	roomID := request.GetString("room_id", "")
 	body := request.GetString("body", "")
@@ -223,6 +233,77 @@ func (s *Server) handleSearchMessages(ctx context.Context, request mcp.CallToolR
 	}
 	b, _ := json.Marshal(msgs)
 	return mcp.NewToolResultText(string(b)), nil
+}
+
+func (s *Server) handleEditMessage(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	agentID, ok := s.agentIDFromContext(ctx)
+	if !ok {
+		return mcp.NewToolResultError("unauthorized"), nil
+	}
+	if s.RateLimiter != nil && !s.RateLimiter.Allow(agentID) {
+		return mcp.NewToolResultError("rate limit exceeded"), nil
+	}
+	messageID := request.GetString("message_id", "")
+	body := request.GetString("body", "")
+	if messageID == "" || body == "" {
+		return mcp.NewToolResultError("message_id and body are required"), nil
+	}
+
+	msg, _ := roomspkg.GetMessage(s.DB, messageID)
+	if err := roomspkg.EditMessage(s.DB, messageID, agentID, body); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	meta := map[string]any{}
+	if msg != nil {
+		meta["room_id"] = msg.RoomID
+	}
+	_ = auditpkg.Log(s.DB, agentID, "message.edited", "message", messageID, meta)
+
+	if s.Subscriptions != nil && msg != nil {
+		for _, sid := range s.Subscriptions.Subscribers(msg.RoomID) {
+			_ = s.SendNotificationToSpecificClient(sid, mcp.MethodNotificationResourceUpdated, map[string]any{
+				"uri": "rooms://" + msg.RoomID + "/messages",
+			})
+		}
+	}
+
+	return mcp.NewToolResultText(`{"ok":true}`), nil
+}
+
+func (s *Server) handleDeleteMessage(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	agentID, ok := s.agentIDFromContext(ctx)
+	if !ok {
+		return mcp.NewToolResultError("unauthorized"), nil
+	}
+	if s.RateLimiter != nil && !s.RateLimiter.Allow(agentID) {
+		return mcp.NewToolResultError("rate limit exceeded"), nil
+	}
+	messageID := request.GetString("message_id", "")
+	if messageID == "" {
+		return mcp.NewToolResultError("message_id is required"), nil
+	}
+
+	msg, _ := roomspkg.GetMessage(s.DB, messageID)
+	if err := roomspkg.DeleteMessage(s.DB, messageID, agentID); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	meta := map[string]any{}
+	if msg != nil {
+		meta["room_id"] = msg.RoomID
+	}
+	_ = auditpkg.Log(s.DB, agentID, "message.deleted", "message", messageID, meta)
+
+	if s.Subscriptions != nil && msg != nil {
+		for _, sid := range s.Subscriptions.Subscribers(msg.RoomID) {
+			_ = s.SendNotificationToSpecificClient(sid, mcp.MethodNotificationResourceUpdated, map[string]any{
+				"uri": "rooms://" + msg.RoomID + "/messages",
+			})
+		}
+	}
+
+	return mcp.NewToolResultText(`{"ok":true}`), nil
 }
 
 func (s *Server) handleRequestApproval(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -350,5 +431,43 @@ func (s *Server) handleListAttachments(ctx context.Context, request mcp.CallTool
 		})
 	}
 	b, _ := json.Marshal(out)
+	return mcp.NewToolResultText(string(b)), nil
+}
+
+func (s *Server) handleConnectPeer(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	peerURL := request.GetString("peer_url", "")
+	if peerURL == "" {
+		return mcp.NewToolResultError("peer_url is required"), nil
+	}
+	if s.Relay == nil {
+		s.Relay = relaypkg.New(s.DB)
+	}
+	if err := s.Relay.Connect(peerURL); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	b, _ := json.Marshal(map[string]any{"ok": true, "peers": s.Relay.ListPeers()})
+	return mcp.NewToolResultText(string(b)), nil
+}
+
+func (s *Server) handleListPeers(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	if s.Relay == nil {
+		s.Relay = relaypkg.New(s.DB)
+	}
+	b, _ := json.Marshal(s.Relay.ListPeers())
+	return mcp.NewToolResultText(string(b)), nil
+}
+
+func (s *Server) handleDisconnectPeer(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	peerURL := request.GetString("peer_url", "")
+	if peerURL == "" {
+		return mcp.NewToolResultError("peer_url is required"), nil
+	}
+	if s.Relay == nil {
+		s.Relay = relaypkg.New(s.DB)
+	}
+	if err := s.Relay.Disconnect(peerURL); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	b, _ := json.Marshal(map[string]any{"ok": true, "peers": s.Relay.ListPeers()})
 	return mcp.NewToolResultText(string(b)), nil
 }

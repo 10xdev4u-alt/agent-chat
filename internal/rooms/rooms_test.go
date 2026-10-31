@@ -187,3 +187,89 @@ func TestReadCursor(t *testing.T) {
 func createTestAgent(db *sql.DB, name, harness, repo, branch string) (string, string, error) {
 	return dbpkg.CreateAgent(db, name, harness, repo, branch, "agent")
 }
+
+func TestEditMessage(t *testing.T) {
+	db := setupTestDB(t)
+	agent1, _, _ := createTestAgent(db, "alice", "claude-code", "repo", "main")
+	agent2, _, _ := createTestAgent(db, "bob", "codex", "repo", "main")
+	roomID, _ := CreateRoom(db, "general", agent1)
+
+	msgID, _, _ := SendMessage(db, roomID, agent1, "hello", nil, "", "normal")
+
+	// Non-sender cannot edit.
+	if err := EditMessage(db, msgID, agent2, "changed"); err == nil {
+		t.Error("expected error for non-sender edit")
+	}
+
+	// Sender can edit.
+	if err := EditMessage(db, msgID, agent1, "hello edited"); err != nil {
+		t.Fatal(err)
+	}
+	msg, err := GetMessage(db, msgID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if msg.Body != "hello edited" {
+		t.Errorf("expected edited body, got %s", msg.Body)
+	}
+	if msg.EditedAt == "" {
+		t.Error("expected edited_at set")
+	}
+	if IsDeleted(*msg) {
+		t.Error("should not be deleted")
+	}
+
+	// Empty body rejected.
+	if err := EditMessage(db, msgID, agent1, ""); err == nil {
+		t.Error("expected error for empty body")
+	}
+}
+
+func TestDeleteMessage(t *testing.T) {
+	db := setupTestDB(t)
+	agent1, _, _ := createTestAgent(db, "alice", "claude-code", "repo", "main")
+	agent2, _, _ := createTestAgent(db, "bob", "codex", "repo", "main")
+	agent3, _, _ := createTestAgent(db, "carol", "codex", "repo", "main")
+	roomID, _ := CreateRoom(db, "general", agent1)
+	JoinRoom(db, roomID, agent2, "member")
+	JoinRoom(db, roomID, agent3, "member")
+
+	msgID, _, _ := SendMessage(db, roomID, agent2, "hello", nil, "", "normal")
+
+	// Non-sender non-owner cannot delete.
+	if err := DeleteMessage(db, msgID, agent3); err == nil {
+		t.Error("expected error for unauthorized delete")
+	}
+
+	// Sender can delete.
+	if err := DeleteMessage(db, msgID, agent2); err != nil {
+		t.Fatal(err)
+	}
+	msg, err := GetMessage(db, msgID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !IsDeleted(*msg) {
+		t.Error("expected deleted")
+	}
+	// ReadMessages excludes deleted.
+	msgs, _ := ReadMessages(db, roomID, 0, 50)
+	if len(msgs) != 0 {
+		t.Errorf("expected 0 live messages, got %d", len(msgs))
+	}
+
+	// Room owner can delete another's message.
+	msgID2, _, _ := SendMessage(db, roomID, agent2, "second", nil, "", "normal")
+	if err := DeleteMessage(db, msgID2, agent1); err != nil {
+		t.Fatal(err)
+	}
+	msg2, _ := GetMessage(db, msgID2)
+	if !IsDeleted(*msg2) {
+		t.Error("expected deleted by owner")
+	}
+
+	// Idempotent-ish: deleting already deleted returns nil.
+	if err := DeleteMessage(db, msgID, agent2); err != nil {
+		t.Errorf("expected nil on already deleted, got %v", err)
+	}
+}

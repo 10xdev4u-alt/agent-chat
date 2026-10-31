@@ -245,3 +245,67 @@ func scanMessageRow(row *sql.Row) ([]Message, error) {
 	}
 	return []Message{m}, nil
 }
+
+// IsDeleted reports whether the message has been soft-deleted.
+func IsDeleted(msg Message) bool {
+	return msg.DeletedAt != ""
+}
+
+// EditMessage updates a message body. Only the original sender may edit.
+func EditMessage(db *sql.DB, messageID, senderID, newBody string) error {
+	if newBody == "" {
+		return fmt.Errorf("message body is required")
+	}
+	msg, err := GetMessage(db, messageID)
+	if err != nil {
+		return err
+	}
+	if IsDeleted(*msg) {
+		return fmt.Errorf("message is deleted: %s", messageID)
+	}
+	if msg.SenderID != senderID {
+		return fmt.Errorf("only sender can edit message")
+	}
+	res, err := db.Exec(
+		`UPDATE messages SET body = ?, edited_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND sender_id = ? AND deleted_at IS NULL`,
+		newBody, messageID, senderID,
+	)
+	if err != nil {
+		return fmt.Errorf("edit message: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("message not found or not editable: %s", messageID)
+	}
+	return nil
+}
+
+// DeleteMessage soft-deletes a message. Only the sender or room owner may delete.
+func DeleteMessage(db *sql.DB, messageID, senderID string) error {
+	msg, err := GetMessage(db, messageID)
+	if err != nil {
+		return err
+	}
+	if IsDeleted(*msg) {
+		return nil
+	}
+	room, err := GetRoom(db, msg.RoomID)
+	if err != nil {
+		return err
+	}
+	if msg.SenderID != senderID && room.OwnerID != senderID {
+		return fmt.Errorf("only sender or room owner can delete message")
+	}
+	res, err := db.Exec(
+		`UPDATE messages SET deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ? AND deleted_at IS NULL`,
+		messageID,
+	)
+	if err != nil {
+		return fmt.Errorf("delete message: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("message not found or already deleted: %s", messageID)
+	}
+	return nil
+}

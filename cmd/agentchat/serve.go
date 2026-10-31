@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/10xdev4u-alt/agent-chat/internal/auth"
 	"github.com/10xdev4u-alt/agent-chat/internal/db"
 	"github.com/10xdev4u-alt/agent-chat/internal/mcp"
+	"github.com/10xdev4u-alt/agent-chat/internal/oauth"
 	"github.com/10xdev4u-alt/agent-chat/internal/web"
 )
 
@@ -36,6 +38,7 @@ func runServe() {
 	}
 
 	auth.SetDB(conn)
+	oauth.SetDB(conn)
 
 	srv, err := mcp.NewServer(conn)
 	if err != nil {
@@ -44,13 +47,29 @@ func runServe() {
 	}
 
 	// Mount web UI on / and MCP on /mcp.
-	mux := http.NewServeMux()
-	mux.Handle("/mcp", srv.HTTPServer)
-	mux.Handle("/", web.Handler(conn))
+	webHandler := web.Handler(conn)
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/mcp" || strings.HasPrefix(r.URL.Path, "/mcp/"):
+			srv.HTTPServer.ServeHTTP(w, r)
+		case r.URL.Path == "/relay/ws":
+			srv.Relay.ServeHTTP(w, r)
+		case r.URL.Path == "/.well-known/oauth-authorization-server":
+			oauth.HandleDiscovery(w, r)
+		case r.URL.Path == "/oauth/token":
+			oauth.HandleToken(w, r)
+		case r.URL.Path == "/oauth/authorize":
+			oauth.HandleAuthorize(w, r)
+		case r.URL.Path == "/oauth/register":
+			oauth.HandleRegister(w, r)
+		default:
+			webHandler.ServeHTTP(w, r)
+		}
+	})
 
 	httpSrv := &http.Server{
 		Addr:    ":8080",
-		Handler: mux,
+		Handler: handler,
 	}
 
 	go func() {

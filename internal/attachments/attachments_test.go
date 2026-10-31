@@ -26,6 +26,7 @@ func setupDB(t *testing.T) *sql.DB {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { conn.Close() })
+	// foreign key: need a message. Insert agent/room/message via raw? Use rooms? Simpler: insert message row manually requires room/member. We'll create via rooms package in tests needing message. For CRUD tests, insert a message row with FK disabled? db has FK pragma only if dsn. Use conn without FK? We'll insert agent+room+message manually.
 	return conn
 }
 

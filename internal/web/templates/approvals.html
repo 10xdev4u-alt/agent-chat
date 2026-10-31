@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head><title>Agent Chat - Approvals</title></head>
+<body>
+<h1>Pending Approvals</h1>
+<ul>
+{{range .Approvals}}
+<li>{{.RequesterName}} in {{.RoomName}}: {{.Action}} ({{.RiskLevel}}) - {{.Description}}</li>
+{{end}}
+</ul>
+<p><a href="/">Dashboard</a></p>
+</body>
+</html>

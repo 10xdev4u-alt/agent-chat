@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head><title>Agent Chat - Dashboard</title></head>
+<body>
+<h1>Agent Chat Dashboard</h1>
+<p>Pending approvals: {{.PendingCount}}</p>
+<h2>Agents</h2>
+<ul>
+{{range .Agents}}
+<li>{{.Name}} ({{.Harness}}) - {{.Status}} {{if .Doing}}- {{.Doing}}{{end}} {{if .Repo}}{{.Repo}}@{{.Branch}}{{end}}</li>
+{{end}}
+</ul>
+<h2>Rooms</h2>
+<ul>
+{{range .Rooms}}
+<li><a href="/rooms/{{.ID}}">{{.Name}}</a></li>
+{{end}}
+</ul>
+<p><a href="/approvals">Approvals</a></p>
+</body>
+</html>

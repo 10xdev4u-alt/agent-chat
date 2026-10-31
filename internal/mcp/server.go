@@ -10,6 +10,7 @@ import (
 
 	authpkg "github.com/10xdev4u-alt/agent-chat/internal/auth"
 	ratelimitpkg "github.com/10xdev4u-alt/agent-chat/internal/ratelimit"
+	relaypkg "github.com/10xdev4u-alt/agent-chat/internal/relay"
 	roomspkg "github.com/10xdev4u-alt/agent-chat/internal/rooms"
 )
 
@@ -21,6 +22,7 @@ type Server struct {
 	LoopGuard     *roomspkg.LoopGuard
 	RateLimiter   *ratelimitpkg.Limiter
 	Subscriptions *SubscriptionManager
+	Relay         *relaypkg.Relay
 
 	// Aliases for compatibility with different callers.
 	MCP                  *server.MCPServer
@@ -44,6 +46,7 @@ func NewServer(db *sql.DB) (*Server, error) {
 		LoopGuard:     roomspkg.NewLoopGuard(12, 10),
 		RateLimiter:   ratelimitpkg.NewLimiter(60),
 		Subscriptions: NewSubscriptionManager(),
+		Relay:         relaypkg.New(db),
 	}
 	s.MCP = mcpSrv
 

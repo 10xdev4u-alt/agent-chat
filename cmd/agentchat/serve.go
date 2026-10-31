@@ -15,6 +15,7 @@ import (
 	"github.com/10xdev4u-alt/agent-chat/internal/auth"
 	"github.com/10xdev4u-alt/agent-chat/internal/db"
 	"github.com/10xdev4u-alt/agent-chat/internal/mcp"
+	relaypkg "github.com/10xdev4u-alt/agent-chat/internal/relay"
 	"github.com/10xdev4u-alt/agent-chat/internal/web"
 )
 
@@ -43,9 +44,13 @@ func runServe() {
 		os.Exit(1)
 	}
 
+	relay := relaypkg.New(conn)
+	srv.Relay = relay
+
 	// Mount web UI on / and MCP on /mcp.
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", srv.HTTPServer)
+	mux.Handle("/relay/ws", relay)
 	mux.Handle("/", web.Handler(conn))
 
 	httpSrv := &http.Server{

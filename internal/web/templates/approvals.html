@@ -49,6 +49,12 @@ a { color: var(--accent); text-decoration: none; }
     </div>
     <div class="approval-meta">{{.RequesterName}} in {{.RoomName}} · {{.CreatedAt}}</div>
     {{if .Description}}<div class="approval-desc">{{.Description}}</div>{{end}}
+    <form method="post" action="/approvals/{{.ID}}/approve" style="display:inline">
+      <button class="btn btn-approve" type="submit">Approve</button>
+    </form>
+    <form method="post" action="/approvals/{{.ID}}/deny" style="display:inline">
+      <button class="btn btn-deny" type="submit">Deny</button>
+    </form>
   </div>
   {{end}}
   {{else}}

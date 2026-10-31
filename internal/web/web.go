@@ -3,10 +3,12 @@ package web
 import (
 	"database/sql"
 	"embed"
-	"fmt"
 	"html/template"
 	"net/http"
+	"strconv"
 
+	"github.com/10xdev4u-alt/agent-chat/internal/approvals"
+	"github.com/10xdev4u-alt/agent-chat/internal/audit"
 	"github.com/10xdev4u-alt/agent-chat/internal/rooms"
 )
 
@@ -34,6 +36,15 @@ func Handler(db *sql.DB) http.Handler {
 	})
 	mux.HandleFunc("/approvals", func(w http.ResponseWriter, r *http.Request) {
 		handleApprovals(w, r, db)
+	})
+	mux.HandleFunc("POST /approvals/{id}/approve", func(w http.ResponseWriter, r *http.Request) {
+		handleApprove(w, r, db)
+	})
+	mux.HandleFunc("POST /approvals/{id}/deny", func(w http.ResponseWriter, r *http.Request) {
+		handleDeny(w, r, db)
+	})
+	mux.HandleFunc("/audit", func(w http.ResponseWriter, r *http.Request) {
+		handleAudit(w, r, db)
 	})
 
 	return mux
@@ -153,4 +164,67 @@ func handleApprovals(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	templates.ExecuteTemplate(w, "approvals.html", map[string]any{"Approvals": approvals})
 }
 
-var _ = fmt.Sprintf
+func handleApprove(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+	id := r.PathValue("id")
+	if id == "" {
+		http.Error(w, "missing id", 400)
+		return
+	}
+	note := r.FormValue("note")
+	approverID := r.FormValue("approver_id")
+	if err := approvals.Approve(db, id, approverID, note); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	_ = audit.Log(db, approverID, "approval.approved", "approval", id, nil)
+	http.Redirect(w, r, "/approvals", http.StatusSeeOther)
+}
+
+func handleDeny(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+	id := r.PathValue("id")
+	if id == "" {
+		http.Error(w, "missing id", 400)
+		return
+	}
+	note := r.FormValue("note")
+	approverID := r.FormValue("approver_id")
+	if err := approvals.Deny(db, id, approverID, note); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	_ = audit.Log(db, approverID, "approval.denied", "approval", id, nil)
+	http.Redirect(w, r, "/approvals", http.StatusSeeOther)
+}
+
+func handleAudit(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+	actor := r.URL.Query().Get("actor")
+	action := r.URL.Query().Get("action")
+	page := 1
+	if p := r.URL.Query().Get("page"); p != "" {
+		if n, err := strconv.Atoi(p); err == nil && n > 0 {
+			page = n
+		}
+	}
+	limit := 50
+	offset := (page - 1) * limit
+
+	events, err := audit.List(db, limit, offset, actor, action)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	hasNext := len(events) == limit
+
+	data := map[string]any{
+		"Events":  events,
+		"Actor":   actor,
+		"Action":  action,
+		"Page":    page,
+		"HasNext": hasNext,
+		"HasPrev": page > 1,
+		"Prev":    page - 1,
+		"Next":    page + 1,
+	}
+	templates.ExecuteTemplate(w, "audit.html", data)
+}

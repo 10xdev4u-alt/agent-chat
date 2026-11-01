@@ -12,6 +12,7 @@ import (
 	attachmentspkg "github.com/10xdev4u-alt/agent-chat/internal/attachments"
 	auditpkg "github.com/10xdev4u-alt/agent-chat/internal/audit"
 	dbpkg "github.com/10xdev4u-alt/agent-chat/internal/db"
+	presencepkg "github.com/10xdev4u-alt/agent-chat/internal/presence"
 	relaypkg "github.com/10xdev4u-alt/agent-chat/internal/relay"
 	roomspkg "github.com/10xdev4u-alt/agent-chat/internal/rooms"
 )
@@ -33,6 +34,7 @@ func (s *Server) handleRegister(ctx context.Context, request mcp.CallToolRequest
 	if err != nil {
 		return nil, fmt.Errorf("create agent: %w", err)
 	}
+	_ = presencepkg.Heartbeat(s.DB, agentID)
 
 	sessionID := uuid.New().String()
 
@@ -232,6 +234,21 @@ func (s *Server) handleSearchMessages(ctx context.Context, request mcp.CallToolR
 		return nil, fmt.Errorf("search messages: %w", err)
 	}
 	b, _ := json.Marshal(msgs)
+	return mcp.NewToolResultText(string(b)), nil
+}
+
+func (s *Server) handleSearchMessagesFTS(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	roomID := request.GetString("room_id", "")
+	query := request.GetString("query", "")
+	if roomID == "" || query == "" {
+		return mcp.NewToolResultError("room_id and query are required"), nil
+	}
+	limit := request.GetInt("limit", 20)
+	results, err := roomspkg.SearchFTSResults(s.DB, roomID, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("search messages fts: %w", err)
+	}
+	b, _ := json.Marshal(results)
 	return mcp.NewToolResultText(string(b)), nil
 }
 
@@ -469,5 +486,42 @@ func (s *Server) handleDisconnectPeer(ctx context.Context, request mcp.CallToolR
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	b, _ := json.Marshal(map[string]any{"ok": true, "peers": s.Relay.ListPeers()})
+	return mcp.NewToolResultText(string(b)), nil
+}
+
+func (s *Server) handleHeartbeat(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	agentID, ok := s.agentIDFromContext(ctx)
+	if !ok {
+		return mcp.NewToolResultError("unauthorized"), nil
+	}
+	if s.RateLimiter != nil && !s.RateLimiter.Allow(agentID) {
+		return mcp.NewToolResultError("rate limit exceeded"), nil
+	}
+	if err := presencepkg.Heartbeat(s.DB, agentID); err != nil {
+		return nil, fmt.Errorf("heartbeat: %w", err)
+	}
+	b, _ := json.Marshal(map[string]any{"ok": true, "status": "online"})
+	return mcp.NewToolResultText(string(b)), nil
+}
+
+func (s *Server) handleGetPresence(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	agentID := request.GetString("agent_id", "")
+	if agentID == "" {
+		if id, ok := s.agentIDFromContext(ctx); ok {
+			agentID = id
+		}
+	}
+	if agentID == "" {
+		return mcp.NewToolResultError("agent_id is required"), nil
+	}
+	p, err := presencepkg.GetPresence(s.DB, agentID)
+	if err != nil {
+		return nil, fmt.Errorf("get presence: %w", err)
+	}
+	b, _ := json.Marshal(map[string]any{
+		"status":    p.Status,
+		"last_seen": p.LastSeen,
+		"is_online": p.IsOnline,
+	})
 	return mcp.NewToolResultText(string(b)), nil
 }

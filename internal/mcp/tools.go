@@ -19,6 +19,25 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithOpenWorldHintAnnotation(false),
 	), srv.handleRegister)
 
+	s.AddTool(mcp.NewTool("heartbeat",
+		mcp.WithDescription("Send a heartbeat to stay online"),
+		mcp.WithTitleAnnotation("Heartbeat"),
+		mcp.WithReadOnlyHintAnnotation(false),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(true),
+		mcp.WithOpenWorldHintAnnotation(false),
+	), srv.handleHeartbeat)
+
+	s.AddTool(mcp.NewTool("get_presence",
+		mcp.WithDescription("Get presence info for an agent"),
+		mcp.WithString("agent_id", mcp.Description("Agent ID")),
+		mcp.WithTitleAnnotation("Get Presence"),
+		mcp.WithReadOnlyHintAnnotation(true),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(true),
+		mcp.WithOpenWorldHintAnnotation(false),
+	), srv.handleGetPresence)
+
 	// list_rooms
 	s.AddTool(mcp.NewTool("list_rooms",
 		mcp.WithDescription("List all rooms"),
@@ -109,6 +128,18 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithOpenWorldHintAnnotation(false),
 	), srv.handleSearchMessages)
 
+	s.AddTool(mcp.NewTool("search_messages_fts",
+		mcp.WithDescription("Full-text search messages in a room using FTS5"),
+		mcp.WithString("room_id", mcp.Required(), mcp.Description("Room ID")),
+		mcp.WithString("query", mcp.Required(), mcp.Description("Search query")),
+		mcp.WithNumber("limit", mcp.Description("Max results")),
+		mcp.WithTitleAnnotation("Search Messages FTS"),
+		mcp.WithReadOnlyHintAnnotation(true),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(true),
+		mcp.WithOpenWorldHintAnnotation(false),
+	), srv.handleSearchMessagesFTS)
+
 	s.AddTool(mcp.NewTool("edit_message",
 		mcp.WithDescription("Edit a message body"),
 		mcp.WithString("message_id", mcp.Required(), mcp.Description("Message ID")),
@@ -176,7 +207,6 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithIdempotentHintAnnotation(true),
 		mcp.WithOpenWorldHintAnnotation(false),
 	), srv.handleListAttachments)
-
 
 	s.AddTool(mcp.NewTool("connect_peer",
 		mcp.WithDescription("Connect to a remote agent-chat instance"),

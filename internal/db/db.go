@@ -47,7 +47,9 @@ func Migrate(dbPath string) error {
 			return fmt.Errorf("read migration %s: %w", f, err)
 		}
 		if _, err := conn.Exec(string(data)); err != nil {
-			return fmt.Errorf("apply migration %s: %w", f, err)
+			if !strings.Contains(err.Error(), "duplicate column name") {
+				return fmt.Errorf("apply migration %s: %w", f, err)
+			}
 		}
 	}
 

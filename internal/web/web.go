@@ -51,7 +51,7 @@ func Handler(db *sql.DB) http.Handler {
 }
 
 func handleDashboard(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	rows, err := db.Query(`SELECT id, name, harness, status, doing, repo, branch FROM agents ORDER BY name`)
+	rows, err := db.Query(`SELECT id, name, harness, status, doing, repo, branch, last_seen FROM agents ORDER BY name`)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -59,25 +59,27 @@ func handleDashboard(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	defer rows.Close()
 
 	type AgentInfo struct {
-		ID      string
-		Name    string
-		Harness string
-		Status  string
-		Doing   string
-		Repo    string
-		Branch  string
+		ID       string
+		Name     string
+		Harness  string
+		Status   string
+		Doing    string
+		Repo     string
+		Branch   string
+		LastSeen string
 	}
 	var agents []AgentInfo
 	for rows.Next() {
 		var a AgentInfo
-		var doing, repo, branch sql.NullString
-		if err := rows.Scan(&a.ID, &a.Name, &a.Harness, &a.Status, &doing, &repo, &branch); err != nil {
+		var doing, repo, branch, lastSeen sql.NullString
+		if err := rows.Scan(&a.ID, &a.Name, &a.Harness, &a.Status, &doing, &repo, &branch, &lastSeen); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
 		a.Doing = doing.String
 		a.Repo = repo.String
 		a.Branch = branch.String
+		a.LastSeen = lastSeen.String
 		agents = append(agents, a)
 	}
 

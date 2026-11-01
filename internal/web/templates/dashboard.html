@@ -91,6 +91,7 @@ a { color: var(--accent); }
         <div class="agent-info">
           <div class="agent-name">{{.Name}}</div>
           <div class="agent-meta">{{.Harness}}{{if .Repo}} · {{.Repo}}@{{.Branch}}{{end}}</div>
+          {{if .LastSeen}}<div class="agent-meta">last seen: {{.LastSeen}}</div>{{end}}
           {{if .Doing}}<div class="agent-doing">{{.Doing}}</div>{{end}}
         </div>
       </div>

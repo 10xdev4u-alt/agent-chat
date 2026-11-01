@@ -161,6 +161,31 @@ func TestSearchMessages(t *testing.T) {
 	}
 }
 
+func TestSearchMessagesFTS(t *testing.T) {
+	db := setupTestDB(t)
+	agent1, _, _ := createTestAgent(db, "alice", "claude-code", "repo", "main")
+	roomID, _ := CreateRoom(db, "general", agent1)
+
+	SendMessage(db, roomID, agent1, "hello world", nil, "", "normal")
+	SendMessage(db, roomID, agent1, "goodbye world", nil, "", "normal")
+	SendMessage(db, roomID, agent1, "hello again", nil, "", "normal")
+
+	like, err := SearchMessages(db, roomID, "hello", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fts, err := SearchMessagesFTS(db, roomID, "hello", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fts) != len(like) {
+		t.Errorf("FTS count %d != LIKE count %d", len(fts), len(like))
+	}
+	if len(fts) != 2 {
+		t.Errorf("expected 2 results, got %d", len(fts))
+	}
+}
+
 func TestReadCursor(t *testing.T) {
 	db := setupTestDB(t)
 	agent1, _, _ := createTestAgent(db, "alice", "claude-code", "repo", "main")

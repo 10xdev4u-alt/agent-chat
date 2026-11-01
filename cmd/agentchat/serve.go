@@ -17,6 +17,7 @@ import (
 	"github.com/10xdev4u-alt/agent-chat/internal/db"
 	"github.com/10xdev4u-alt/agent-chat/internal/mcp"
 	"github.com/10xdev4u-alt/agent-chat/internal/oauth"
+	presencepkg "github.com/10xdev4u-alt/agent-chat/internal/presence"
 	"github.com/10xdev4u-alt/agent-chat/internal/web"
 )
 
@@ -39,6 +40,20 @@ func runServe() {
 
 	auth.SetDB(conn)
 	oauth.SetDB(conn)
+
+	done := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				_, _ = presencepkg.MarkStaleOffline(conn, 5)
+			case <-done:
+				return
+			}
+		}
+	}()
 
 	srv, err := mcp.NewServer(conn)
 	if err != nil {
@@ -90,6 +105,7 @@ func runServe() {
 	if err := httpSrv.Shutdown(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "shutdown: %v\n", err)
 	}
+	close(done)
 	conn.Close()
 }
 

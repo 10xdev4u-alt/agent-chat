@@ -23,6 +23,7 @@ type Agent struct {
 	Role       string
 	CreatedAt  string
 	UpdatedAt  string
+	LastSeen   string
 }
 
 func generateAPIKey() (string, error) {
@@ -84,21 +85,21 @@ func nullable(s string) any {
 // GetAgent looks up an agent by ID.
 func GetAgent(db *sql.DB, id string) (*Agent, error) {
 	row := db.QueryRow(
-		`SELECT id, name, harness, repo, branch, status, doing, api_key_hash, role, created_at, updated_at FROM agents WHERE id = ?`, id)
+		`SELECT id, name, harness, repo, branch, status, doing, api_key_hash, role, created_at, updated_at, last_seen FROM agents WHERE id = ?`, id)
 	return scanAgent(row)
 }
 
 // GetAgentByKeyHash looks up an agent by stored api_key_hash (string equality).
 func GetAgentByKeyHash(db *sql.DB, hash string) (*Agent, error) {
 	row := db.QueryRow(
-		`SELECT id, name, harness, repo, branch, status, doing, api_key_hash, role, created_at, updated_at FROM agents WHERE api_key_hash = ?`, hash)
+		`SELECT id, name, harness, repo, branch, status, doing, api_key_hash, role, created_at, updated_at, last_seen FROM agents WHERE api_key_hash = ?`, hash)
 	return scanAgent(row)
 }
 
 // GetAgentByKey finds the agent whose stored hash matches the given raw key (bcrypt compare).
 func GetAgentByKey(db *sql.DB, key string) (*Agent, error) {
 	rows, err := db.Query(
-		`SELECT id, name, harness, repo, branch, status, doing, api_key_hash, role, created_at, updated_at FROM agents`)
+		`SELECT id, name, harness, repo, branch, status, doing, api_key_hash, role, created_at, updated_at, last_seen FROM agents`)
 	if err != nil {
 		return nil, fmt.Errorf("query agents: %w", err)
 	}
@@ -144,19 +145,24 @@ type scanner interface {
 func scanAgent(row *sql.Row) (*Agent, error) {
 	var a Agent
 	var repo, branch, doing sql.NullString
-	err := row.Scan(&a.ID, &a.Name, &a.Harness, &repo, &branch, &a.Status, &doing, &a.APIKeyHash, &a.Role, &a.CreatedAt, &a.UpdatedAt)
+	var lastSeen sql.NullString
+	err := row.Scan(&a.ID, &a.Name, &a.Harness, &repo, &branch, &a.Status, &doing, &a.APIKeyHash, &a.Role, &a.CreatedAt, &a.UpdatedAt, &lastSeen)
+	if err == nil {
+		a.LastSeen = lastSeen.String
+	}
 	if err != nil {
 		return nil, err
 	}
 	a.Repo = repo.String
 	a.Branch = branch.String
 	a.Doing = doing.String
+	a.LastSeen = lastSeen.String
 	return &a, nil
 }
 
 // ListAgents returns all registered agents.
 func ListAgents(db *sql.DB) ([]Agent, error) {
-	rows, err := db.Query(`SELECT id, name, harness, repo, branch, status, doing, api_key_hash, role, created_at, updated_at FROM agents ORDER BY created_at`)
+	rows, err := db.Query(`SELECT id, name, harness, repo, branch, status, doing, api_key_hash, role, created_at, updated_at, last_seen FROM agents ORDER BY created_at`)
 	if err != nil {
 		return nil, err
 	}
@@ -175,12 +181,14 @@ func ListAgents(db *sql.DB) ([]Agent, error) {
 func scanAgentRows(rows *sql.Rows) (*Agent, error) {
 	var a Agent
 	var repo, branch, doing sql.NullString
-	err := rows.Scan(&a.ID, &a.Name, &a.Harness, &repo, &branch, &a.Status, &doing, &a.APIKeyHash, &a.Role, &a.CreatedAt, &a.UpdatedAt)
+	var lastSeen sql.NullString
+	err := rows.Scan(&a.ID, &a.Name, &a.Harness, &repo, &branch, &a.Status, &doing, &a.APIKeyHash, &a.Role, &a.CreatedAt, &a.UpdatedAt, &lastSeen)
 	if err != nil {
 		return nil, err
 	}
 	a.Repo = repo.String
 	a.Branch = branch.String
 	a.Doing = doing.String
+	a.LastSeen = lastSeen.String
 	return &a, nil
 }

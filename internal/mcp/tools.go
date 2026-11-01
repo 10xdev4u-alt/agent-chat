@@ -109,6 +109,18 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithOpenWorldHintAnnotation(false),
 	), srv.handleSearchMessages)
 
+	s.AddTool(mcp.NewTool("search_messages_fts",
+		mcp.WithDescription("Full-text search messages in a room using FTS5"),
+		mcp.WithString("room_id", mcp.Required(), mcp.Description("Room ID")),
+		mcp.WithString("query", mcp.Required(), mcp.Description("Search query")),
+		mcp.WithNumber("limit", mcp.Description("Max results")),
+		mcp.WithTitleAnnotation("Search Messages FTS"),
+		mcp.WithReadOnlyHintAnnotation(true),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(true),
+		mcp.WithOpenWorldHintAnnotation(false),
+	), srv.handleSearchMessagesFTS)
+
 	s.AddTool(mcp.NewTool("edit_message",
 		mcp.WithDescription("Edit a message body"),
 		mcp.WithString("message_id", mcp.Required(), mcp.Description("Message ID")),
@@ -176,7 +188,6 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithIdempotentHintAnnotation(true),
 		mcp.WithOpenWorldHintAnnotation(false),
 	), srv.handleListAttachments)
-
 
 	s.AddTool(mcp.NewTool("connect_peer",
 		mcp.WithDescription("Connect to a remote agent-chat instance"),

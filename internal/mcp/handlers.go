@@ -236,6 +236,21 @@ func (s *Server) handleSearchMessages(ctx context.Context, request mcp.CallToolR
 	return mcp.NewToolResultText(string(b)), nil
 }
 
+func (s *Server) handleSearchMessagesFTS(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	roomID := request.GetString("room_id", "")
+	query := request.GetString("query", "")
+	if roomID == "" || query == "" {
+		return mcp.NewToolResultError("room_id and query are required"), nil
+	}
+	limit := request.GetInt("limit", 20)
+	results, err := roomspkg.SearchFTSResults(s.DB, roomID, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("search messages fts: %w", err)
+	}
+	b, _ := json.Marshal(results)
+	return mcp.NewToolResultText(string(b)), nil
+}
+
 func (s *Server) handleEditMessage(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	agentID, ok := s.agentIDFromContext(ctx)
 	if !ok {

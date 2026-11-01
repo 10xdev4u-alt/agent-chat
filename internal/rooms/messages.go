@@ -323,3 +323,64 @@ func DeleteMessage(db *sql.DB, messageID, senderID string) error {
 	}
 	return nil
 }
+
+type FTSSearchResult struct {
+	MessageID string  `json:"message_id"`
+	Snippet   string  `json:"snippet"`
+	Rank      float64 `json:"rank"`
+}
+
+func SearchMessagesFTS(db *sql.DB, roomID, query string, limit int) ([]Message, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	rows, err := db.Query(
+		`SELECT m.id, m.room_id, m.sender_id, m.body, m.mentions, m.reply_to, m.priority, m.seq, m.created_at, m.edited_at, m.deleted_at
+		 FROM messages_fts
+		 JOIN messages m ON m.id = messages_fts.message_id
+		 WHERE messages_fts.room_id = ? AND messages_fts MATCH ? AND m.deleted_at IS NULL
+		 ORDER BY messages_fts.rank
+		 LIMIT ?`,
+		roomID, query, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	msgs, err := scanMessages(rows)
+	if err != nil {
+		return nil, err
+	}
+	populateAttachments(db, msgs)
+	return msgs, nil
+}
+
+func SearchFTSResults(db *sql.DB, roomID, query string, limit int) ([]FTSSearchResult, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	rows, err := db.Query(
+		`SELECT message_id, snippet(messages_fts, 0, '<b>', '</b>', '...', 10), rank
+		 FROM messages_fts
+		 WHERE room_id = ? AND messages_fts MATCH ?
+		 ORDER BY rank
+		 LIMIT ?`,
+		roomID, query, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []FTSSearchResult
+	for rows.Next() {
+		var r FTSSearchResult
+		if err := rows.Scan(&r.MessageID, &r.Snippet, &r.Rank); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}

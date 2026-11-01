@@ -177,6 +177,37 @@ func registerTools(s *server.MCPServer, srv *Server) {
 		mcp.WithOpenWorldHintAnnotation(false),
 	), srv.handleListAttachments)
 
+	s.AddTool(mcp.NewTool("add_reaction",
+		mcp.WithDescription("React to a message with an emoji"),
+		mcp.WithString("message_id", mcp.Required(), mcp.Description("Message ID")),
+		mcp.WithString("emoji", mcp.Required(), mcp.Description("Emoji")),
+		mcp.WithTitleAnnotation("Add Reaction"),
+		mcp.WithReadOnlyHintAnnotation(false),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(true),
+		mcp.WithOpenWorldHintAnnotation(false),
+	), srv.handleAddReaction)
+
+	s.AddTool(mcp.NewTool("remove_reaction",
+		mcp.WithDescription("Remove an emoji reaction from a message"),
+		mcp.WithString("message_id", mcp.Required(), mcp.Description("Message ID")),
+		mcp.WithString("emoji", mcp.Required(), mcp.Description("Emoji")),
+		mcp.WithTitleAnnotation("Remove Reaction"),
+		mcp.WithReadOnlyHintAnnotation(false),
+		mcp.WithDestructiveHintAnnotation(true),
+		mcp.WithIdempotentHintAnnotation(true),
+		mcp.WithOpenWorldHintAnnotation(false),
+	), srv.handleRemoveReaction)
+
+	s.AddTool(mcp.NewTool("list_reactions",
+		mcp.WithDescription("List reactions for a message"),
+		mcp.WithString("message_id", mcp.Required(), mcp.Description("Message ID")),
+		mcp.WithTitleAnnotation("List Reactions"),
+		mcp.WithReadOnlyHintAnnotation(true),
+		mcp.WithDestructiveHintAnnotation(false),
+		mcp.WithIdempotentHintAnnotation(true),
+		mcp.WithOpenWorldHintAnnotation(false),
+	), srv.handleListReactions)
 
 	s.AddTool(mcp.NewTool("connect_peer",
 		mcp.WithDescription("Connect to a remote agent-chat instance"),

@@ -13,6 +13,7 @@ import (
 	auditpkg "github.com/10xdev4u-alt/agent-chat/internal/audit"
 	dbpkg "github.com/10xdev4u-alt/agent-chat/internal/db"
 	presencepkg "github.com/10xdev4u-alt/agent-chat/internal/presence"
+	reactionspkg "github.com/10xdev4u-alt/agent-chat/internal/reactions"
 	relaypkg "github.com/10xdev4u-alt/agent-chat/internal/relay"
 	roomspkg "github.com/10xdev4u-alt/agent-chat/internal/rooms"
 )
@@ -445,6 +446,81 @@ func (s *Server) handleListAttachments(ctx context.Context, request mcp.CallTool
 			"filename":     a.Filename,
 			"content_type": a.ContentType,
 			"size_bytes":   a.SizeBytes,
+		})
+	}
+	b, _ := json.Marshal(out)
+	return mcp.NewToolResultText(string(b)), nil
+}
+
+func (s *Server) handleAddReaction(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	agentID, ok := s.agentIDFromContext(ctx)
+	if !ok {
+		return mcp.NewToolResultError("unauthorized"), nil
+	}
+	if s.RateLimiter != nil && !s.RateLimiter.Allow(agentID) {
+		return mcp.NewToolResultError("rate limit exceeded"), nil
+	}
+	messageID := request.GetString("message_id", "")
+	emoji := request.GetString("emoji", "")
+	if messageID == "" || emoji == "" {
+		return mcp.NewToolResultError("message_id and emoji are required"), nil
+	}
+	msg, _ := roomspkg.GetMessage(s.DB, messageID)
+	if err := reactionspkg.AddReaction(s.DB, messageID, agentID, emoji); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	meta := map[string]any{"emoji": emoji}
+	if msg != nil {
+		meta["room_id"] = msg.RoomID
+	}
+	_ = auditpkg.Log(s.DB, agentID, "reaction.added", "message", messageID, meta)
+	return mcp.NewToolResultText(`{"ok":true}`), nil
+}
+
+func (s *Server) handleRemoveReaction(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	agentID, ok := s.agentIDFromContext(ctx)
+	if !ok {
+		return mcp.NewToolResultError("unauthorized"), nil
+	}
+	if s.RateLimiter != nil && !s.RateLimiter.Allow(agentID) {
+		return mcp.NewToolResultError("rate limit exceeded"), nil
+	}
+	messageID := request.GetString("message_id", "")
+	emoji := request.GetString("emoji", "")
+	if messageID == "" || emoji == "" {
+		return mcp.NewToolResultError("message_id and emoji are required"), nil
+	}
+	msg, _ := roomspkg.GetMessage(s.DB, messageID)
+	if err := reactionspkg.RemoveReaction(s.DB, messageID, agentID, emoji); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	meta := map[string]any{"emoji": emoji}
+	if msg != nil {
+		meta["room_id"] = msg.RoomID
+	}
+	_ = auditpkg.Log(s.DB, agentID, "reaction.removed", "message", messageID, meta)
+	return mcp.NewToolResultText(`{"ok":true}`), nil
+}
+
+func (s *Server) handleListReactions(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	_, ok := s.agentIDFromContext(ctx)
+	if !ok {
+		return mcp.NewToolResultError("unauthorized"), nil
+	}
+	messageID := request.GetString("message_id", "")
+	if messageID == "" {
+		return mcp.NewToolResultError("message_id is required"), nil
+	}
+	sums, err := reactionspkg.GetReactionSummary(s.DB, messageID)
+	if err != nil {
+		return nil, fmt.Errorf("list reactions: %w", err)
+	}
+	out := make([]map[string]any, 0, len(sums))
+	for _, s := range sums {
+		out = append(out, map[string]any{
+			"emoji":  s.Emoji,
+			"count":  s.Count,
+			"agents": s.Agents,
 		})
 	}
 	b, _ := json.Marshal(out)

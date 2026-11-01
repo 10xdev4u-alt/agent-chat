@@ -7,22 +7,24 @@ import (
 	"strings"
 
 	attachmentspkg "github.com/10xdev4u-alt/agent-chat/internal/attachments"
+	reactionspkg "github.com/10xdev4u-alt/agent-chat/internal/reactions"
 )
 
 // Message represents a chat message.
 type Message struct {
-	ID          string                      `json:"id"`
-	RoomID      string                      `json:"room_id"`
-	SenderID    string                      `json:"sender_id"`
-	Body        string                      `json:"body"`
-	Mentions    []string                    `json:"mentions,omitempty"`
-	ReplyTo     string                      `json:"reply_to,omitempty"`
-	Priority    string                      `json:"priority"`
-	Seq         int                         `json:"seq"`
-	CreatedAt   string                      `json:"created_at"`
-	EditedAt    string                      `json:"edited_at,omitempty"`
-	DeletedAt   string                      `json:"deleted_at,omitempty"`
-	Attachments []attachmentspkg.Attachment `json:"attachments,omitempty"`
+	ID          string                         `json:"id"`
+	RoomID      string                         `json:"room_id"`
+	SenderID    string                         `json:"sender_id"`
+	Body        string                         `json:"body"`
+	Mentions    []string                       `json:"mentions,omitempty"`
+	ReplyTo     string                         `json:"reply_to,omitempty"`
+	Priority    string                         `json:"priority"`
+	Seq         int                            `json:"seq"`
+	CreatedAt   string                         `json:"created_at"`
+	EditedAt    string                         `json:"edited_at,omitempty"`
+	DeletedAt   string                         `json:"deleted_at,omitempty"`
+	Attachments []attachmentspkg.Attachment    `json:"attachments,omitempty"`
+	Reactions   []reactionspkg.ReactionSummary `json:"reactions,omitempty"`
 }
 
 func SendMessage(db *sql.DB, roomID, senderID, body string, mentions []string, replyTo, priority string, attachmentIDs ...any) (string, int, error) {
@@ -120,6 +122,7 @@ func ReadMessages(db *sql.DB, roomID string, afterSeq int, limit int) ([]Message
 		return nil, err
 	}
 	populateAttachments(db, msgs)
+	populateReactions(db, msgs)
 	return msgs, nil
 }
 
@@ -141,6 +144,7 @@ func SearchMessages(db *sql.DB, roomID, query string, limit int) ([]Message, err
 		return nil, err
 	}
 	populateAttachments(db, msgs)
+	populateReactions(db, msgs)
 	return msgs, nil
 }
 
@@ -155,6 +159,7 @@ func GetMessage(db *sql.DB, id string) (*Message, error) {
 		return nil, fmt.Errorf("message not found: %s", id)
 	}
 	populateAttachments(db, msgs)
+	populateReactions(db, msgs)
 	return &msgs[0], nil
 }
 
@@ -190,6 +195,15 @@ func populateAttachments(db *sql.DB, msgs []Message) {
 		atts, err := attachmentspkg.ListAttachments(db, msgs[i].ID)
 		if err == nil {
 			msgs[i].Attachments = atts
+		}
+	}
+}
+
+func populateReactions(db *sql.DB, msgs []Message) {
+	for i := range msgs {
+		sums, err := reactionspkg.GetReactionSummary(db, msgs[i].ID)
+		if err == nil {
+			msgs[i].Reactions = sums
 		}
 	}
 }
@@ -322,10 +336,10 @@ func SearchMessagesFTS(db *sql.DB, roomID, query string, limit int) ([]Message, 
 	}
 	rows, err := db.Query(
 		`SELECT m.id, m.room_id, m.sender_id, m.body, m.mentions, m.reply_to, m.priority, m.seq, m.created_at, m.edited_at, m.deleted_at
-		 FROM messages_fts f
-		 JOIN messages m ON m.id = f.message_id
-		 WHERE f.room_id = ? AND f MATCH ? AND m.deleted_at IS NULL
-		 ORDER BY f.rank
+		 FROM messages_fts
+		 JOIN messages m ON m.id = messages_fts.message_id
+		 WHERE messages_fts.room_id = ? AND messages_fts MATCH ? AND m.deleted_at IS NULL
+		 ORDER BY messages_fts.rank
 		 LIMIT ?`,
 		roomID, query, limit,
 	)
@@ -346,10 +360,10 @@ func SearchFTSResults(db *sql.DB, roomID, query string, limit int) ([]FTSSearchR
 		limit = 20
 	}
 	rows, err := db.Query(
-		`SELECT f.message_id, snippet(messages_fts, 0, '<b>', '</b>', '...', 10), f.rank
-		 FROM messages_fts f
-		 WHERE f.room_id = ? AND f MATCH ?
-		 ORDER BY f.rank
+		`SELECT messages_fts.message_id, snippet(messages_fts, 0, '<b>', '</b>', '...', 10), messages_fts.rank
+		 FROM messages_fts
+		 WHERE messages_fts.room_id = ? AND messages_fts MATCH ?
+		 ORDER BY messages_fts.rank
 		 LIMIT ?`,
 		roomID, query, limit,
 	)
